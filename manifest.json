@@ -1,0 +1,17 @@
+{
+  "name": "方块地产 - 联机大富翁",
+  "short_name": "方块地产",
+  "description": "和朋友一起联机玩的像素风大富翁游戏",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF6F0",
+  "theme_color": "#FAF6F0",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23FAF6F0'/%3E%3Crect x='20' y='20' width='60' height='60' fill='%23E8935A' stroke='%234A3728' stroke-width='6'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#FAF6F0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>方块地产 · 联机大富翁</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23FAF6F0'/%3E%3Crect x='20' y='20' width='60' height='60' fill='%23E8935A' stroke='%234A3728' stroke-width='6'/%3E%3C/svg%3E">
+
+<style>
+  :root {
+    --bg: #FAF6F0;
+    --ink: #4A3728;
+    --ink-soft: #8A7A6B;
+    --panel: #FFFFFF;
+    --panel-border: #E5DDD0;
+    --accent: #E8935A;
+    --accent-deep: #C9743A;
+    --danger: #D9534F;
+    --success: #6FB87F;
+    --shadow-pixel: 3px 3px 0 var(--ink);
+
+    --g-brown: #B8896B;
+    --g-lightblue: #7EC8E3;
+    --g-pink: #C9A0DC;
+    --g-orange: #E8935A;
+    --g-red: #D9534F;
+    --g-yellow: #E8C547;
+    --g-green: #6FB87F;
+    --g-darkblue: #4A6FA5;
+
+    --radius-s: 6px;
+    --radius-m: 10px;
+    --radius-l: 16px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    overscroll-behavior: none;
+    height: 100%;
+    width: 100%;
+    position: fixed;
+    overflow: hidden;
+  }
+
+  #app {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pixel-font {
+    font-family: "Pixel", -apple-system, sans-serif;
+    letter-spacing: 0.5px;
+  }
+
+  @font-face {
+    font-family: "Pixel";
+    src: local("Press Start 2P");
+  }
+
+  /* ---------- 通用按钮 ---------- */
+  .btn {
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-s);
+    background: var(--panel);
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 700;
+    padding: 12px 18px;
+    box-shadow: var(--shadow-pixel);
+    cursor: pointer;
+    transition: transform 0.08s, box-shadow 0.08s;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--ink);
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-success { background: var(--success); color: white; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-block { width: 100%; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; transform: none; }
+
+  .input {
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-s);
+    padding: 12px 14px;
+    font-size: 16px;
+    background: var(--panel);
+    color: var(--ink);
+    width: 100%;
+  }
+  .input:focus { outline: 3px solid var(--accent); outline-offset: 1px; }
+
+  .card {
+    background: var(--panel);
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-m);
+    box-shadow: var(--shadow-pixel);
+    padding: 16px;
+  }
+
+  /* ---------- 屏幕容器 ---------- */
+  .screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .screen-center {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+
+  .logo-title {
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--accent-deep);
+    margin-bottom: 4px;
+  }
+  .logo-sub {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 32px;
+  }
+
+  .stack { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row-between { display: flex; justify-content: space-between; align-items: center; }
+
+  .hidden { display: none !important; }
+
+  /* 棋子（纯CSS绘制圆形像素棋子，非图片） */
+  .token {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2.5px solid var(--ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 900;
+    color: white;
+    flex-shrink: 0;
+  }
+  .token-lg { width: 34px; height: 34px; font-size: 14px; }
+
+  /* 玩家配色（与地产组色区分，走暖色系8色板） */
+  :root {
+    --pc-0: #E8935A;
+    --pc-1: #4A6FA5;
+    --pc-2: #6FB87F;
+    --pc-3: #C9A0DC;
+    --pc-4: #D9534F;
+    --pc-5: #E8C547;
+  }
+  .pc-0 { background: var(--pc-0); }
+  .pc-1 { background: var(--pc-1); }
+  .pc-2 { background: var(--pc-2); }
+  .pc-3 { background: var(--pc-3); }
+  .pc-4 { background: var(--pc-4); }
+  .pc-5 { background: var(--pc-5); }
+
+  /* 顶部状态条 */
+  .topbar {
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 3px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .topbar-title { font-weight: 800; font-size: 15px; }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; margin-right: 6px; }
+  .conn-dot.offline { background: var(--danger); }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: white;
+    padding: 10px 18px;
+    border-radius: var(--radius-s);
+    font-size: 14px;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none;
+    max-width: 85%;
+    text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+
+  /* 加载动画 */
+  .spinner {
+    width: 28px; height: 28px;
+    border: 4px solid var(--panel-border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- 游戏主界面 ---------- */
+  .game-wrap {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .player-strip {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 4px 2px;
+  }
+  .player-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel);
+    border: 2.5px solid var(--panel-border);
+    border-radius: var(--radius-s);
+    padding: 6px 10px;
+    flex-shrink: 0;
+    opacity: 0.6;
+  }
+  .player-chip-active {
+    border-color: var(--accent);
+    opacity: 1;
+    box-shadow: 2px 2px 0 var(--accent);
+  }
+  .player-chip-bankrupt { opacity: 0.35; filter: grayscale(1); }
+  .player-chip-info { display: flex; flex-direction: column; line-height: 1.2; }
+  .player-chip-name { font-size: 11px; font-weight: 700; }
+  .player-chip-cash { font-size: 12px; font-weight: 800; color: var(--accent-deep); }
+
+  /* 棋盘：11x11 网格，外圈40格+中心信息区 */
+  .board-area {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    max-width: 100%;
+    position: relative; /* 棋子用绝对定位叠加在棋盘上方，独立于格子DOM做滑动动画 */
+  }
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(11, 1fr);
+    grid-template-rows: repeat(11, 1fr);
+    width: 100%;
+    height: 100%;
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-m);
+    overflow: hidden;
+    background: var(--panel);
+    position: relative;
+  }
+
+  /* 棋子层：绝对定位覆盖在棋盘上，用left/top的transition实现滑动跳格效果 */
+  .token-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .token-moving {
+    position: absolute;
+    transition: left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: translate(-50%, -50%);
+  }
+  .token-bounce {
+    animation: token-land 0.35s ease-out;
+  }
+  @keyframes token-land {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    40% { transform: translate(-50%, -60%) scale(1.15); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+  }
+
+  .tile {
+    position: relative;
+    border: 1px solid var(--panel-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    font-size: 6.5px;
+    padding: 2px 1px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .tile-corner {
+    background: var(--bg);
+    font-size: 7.5px;
+    font-weight: 800;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .tile-colorbar { width: 100%; height: 6px; flex-shrink: 0; margin-bottom: 1px; }
+  .tile-name {
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.05;
+    word-break: break-all;
+    color: var(--ink);
+  }
+  .tile-price { font-size: 6px; color: var(--ink-soft); margin-top: auto; }
+  .tile-owner-bar { width: 80%; height: 3px; border-radius: 2px; margin-top: 2px; }
+  .tile-houses { font-size: 6px; margin-top: 1px; line-height: 1; }
+  .tile-mortgaged { font-size: 5px; color: var(--danger); }
+  .tile-tokens {
+    position: absolute;
+    bottom: 1px; right: 1px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    max-width: 90%;
+  }
+  .tile-tokens .token { width: 10px; height: 10px; font-size: 5px; border-width: 1px; }
+
+  .tile-go { background: #FFF3E0; }
+  .tile-jail { background: #ECECEC; }
+  .tile-freeparking { background: #F0FAF2; }
+  .tile-gotojail { background: #FCEAEA; }
+  .tile-tax { background: #FFF9E6; }
+  .tile-card { background: #F3EEFB; }
+  .tile-bank { background: #FFF8E1; }
+  .tile-lottery { background: #FCE4EC; }
+  .tile-station { background: #ECEFF9; }
+  .tile-utility { background: #E8F5F0; }
+
+  .tile-icon { font-size: 11px; line-height: 1; margin-bottom: 1px; }
+  .tile-corner .tile-icon { font-size: 16px; }
+
+  /* 所有权染色：整块格子背景变为玩家主题色的淡化版本，一眼看出归属 */
+  .tile-owned-bg {
+    position: absolute;
+    inset: 0;
+    opacity: 0.32;
+    z-index: 0;
+  }
+  .tile > * { position: relative; z-index: 1; }
+
+  .board-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dice-display { display: flex; gap: 10px; }
+  .die {
+    width: 44px; height: 44px;
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-s);
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 900;
+    box-shadow: var(--shadow-pixel);
+    perspective: 200px;
+  }
+  .die-face {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+  .die.rolling .die-face {
+    animation: dice-roll 0.08s steps(1) infinite;
+  }
+  .die.rolling {
+    animation: dice-shake 0.15s ease-in-out infinite;
+  }
+  @keyframes dice-roll {
+    0% { transform: rotateX(0deg); }
+    100% { transform: rotateX(360deg); }
+  }
+  @keyframes dice-shake {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(-2px, 1px) rotate(-4deg); }
+    75% { transform: translate(2px, -1px) rotate(4deg); }
+  }
+  .die.settled .die-face {
+    animation: dice-settle 0.3s ease-out;
+  }
+  @keyframes dice-settle {
+    0% { transform: scale(1.3) rotate(15deg); }
+    60% { transform: scale(0.9) rotate(-5deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+
+  .turn-banner {
+    text-align: center;
+    padding: 10px;
+    border-radius: var(--radius-s);
+    background: var(--panel-border);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .turn-banner-mine {
+    background: var(--accent);
+    color: white;
+  }
+
+  .action-panel { min-height: 56px; }
+
+  .log-box {
+    max-height: 150px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .log-line {
+    font-size: 12px;
+    color: var(--ink-soft);
+    padding: 2px 0;
+    border-bottom: 1px dashed var(--panel-border);
+  }
+
+  /* 建房弹窗 */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(74, 55, 40, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+  }
+  .modal-box {
+    width: 100%;
+    max-width: 360px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// 方块地产 · 联机大富翁 — 前端逻辑
+// 单文件 PWA，纯 JS（无框架），通过 WebSocket 连接 Cloudflare Worker 后端
+// ============================================================
+
+// ⚠️ 部署后请把下面这行换成你自己的 Worker 地址（部署说明里会教你怎么拿到）
+const BACKEND_URL = "https://monopoly-game-backend.uziyom.workers.dev";
+const WS_URL = BACKEND_URL.replace("https://", "wss://").replace("http://", "ws://");
+
+// ---------- 棋盘数据（与后端 game-engine.js 完全一致，用于前端渲染，不参与判定）----------
+const BOARD = [
+  { id: 0, type: "go", name: "起点" },
+  { id: 1, type: "property", name: "渔村小屋", group: "brown", price: 60 },
+  { id: 2, type: "card", deck: "fate", name: "命运" },
+  { id: 3, type: "property", name: "码头旧仓", group: "brown", price: 60 },
+  { id: 4, type: "tax", name: "起航税", amount: 200 },
+  { id: 5, type: "station", name: "旧码头", price: 200 },
+  { id: 6, type: "property", name: "灯塔路", group: "lightblue", price: 100 },
+  { id: 7, type: "card", deck: "chance", name: "机会" },
+  { id: 8, type: "property", name: "海风街", group: "lightblue", price: 100 },
+  { id: 9, type: "property", name: "灯塔渡口", group: "lightblue", price: 120 },
+  { id: 10, type: "jail", name: "监狱" },
+  { id: 11, type: "property", name: "紫薰花田", group: "pink", price: 140 },
+  { id: 12, type: "utility", name: "水务局", price: 150 },
+  { id: 13, type: "property", name: "薰衣草坡", group: "pink", price: 140 },
+  { id: 14, type: "bank", name: "银行" },
+  { id: 15, type: "station", name: "中央车站", price: 200 },
+  { id: 16, type: "property", name: "集市街", group: "orange", price: 180 },
+  { id: 17, type: "card", deck: "fate", name: "命运" },
+  { id: 18, type: "property", name: "香料巷", group: "orange", price: 180 },
+  { id: 19, type: "property", name: "集市广场", group: "orange", price: 200 },
+  { id: 20, type: "freeparking", name: "自由集市" },
+  { id: 21, type: "property", name: "金狮大道", group: "red", price: 220 },
+  { id: 22, type: "card", deck: "chance", name: "机会" },
+  { id: 23, type: "property", name: "银鹰广场", group: "red", price: 220 },
+  { id: 24, type: "property", name: "王座街", group: "red", price: 240 },
+  { id: 25, type: "station", name: "山地缆车", price: 200 },
+  { id: 26, type: "property", name: "学院路", group: "yellow", price: 260 },
+  { id: 27, type: "property", name: "钟楼街", group: "yellow", price: 260 },
+  { id: 28, type: "utility", name: "电力公司", price: 150 },
+  { id: 29, type: "property", name: "图书馆道", group: "yellow", price: 280 },
+  { id: 30, type: "gotojail", name: "送入监狱" },
+  { id: 31, type: "property", name: "松林径", group: "green", price: 300 },
+  { id: 32, type: "property", name: "溪谷路", group: "green", price: 300 },
+  { id: 33, type: "card", deck: "fate", name: "命运" },
+  { id: 34, type: "property", name: "高地庄园", group: "green", price: 320 },
+  { id: 35, type: "station", name: "灯塔渡口码头", price: 200 },
+  { id: 36, type: "lottery", name: "彩票站" },
+  { id: 37, type: "property", name: "摩天塔", group: "darkblue", price: 350 },
+  { id: 38, type: "tax", name: "修缮税", amount: 100 },
+  { id: 39, type: "property", name: "云顶天台", group: "darkblue", price: 400 },
+];
+
+const GROUP_COLOR_VAR = {
+  brown: "--g-brown", lightblue: "--g-lightblue", pink: "--g-pink", orange: "--g-orange",
+  red: "--g-red", yellow: "--g-yellow", green: "--g-green", darkblue: "--g-darkblue",
+};
+
+// ---------- 格子类型图标（用于棋盘格子小图标显示）----------
+const TILE_ICONS = {
+  go: "🏁", jail: "🚓", freeparking: "🎪", gotojail: "🚨",
+  tax: "💸", card: "🎴", station: "🚉", utility: "⚡",
+  bank: "🏦", lottery: "🎟️", property: "🏠",
+};
+
+// ---------- 像素小人角色生成器（纯CSS/SVG绘制，无外部图片）----------
+const SKIN_TONES = ["#F4C99B", "#E8A878", "#C68863", "#8D5B3F", "#F2DFC4"];
+const HAIR_COLORS = ["#3A2A1E", "#6B4226", "#1A1A1A", "#A85C2A", "#D4AC4A", "#7A4A6B"];
+const SHIRT_COLORS = ["#E8935A", "#4A6FA5", "#6FB87F", "#C9A0DC", "#D9534F", "#E8C547"];
+const HAIR_STYLES = ["short", "long", "bun", "spiky", "bald", "curly"];
+
+function getPlayerAppearance(player) {
+  // 用 colorIndex 做稳定的"随机但确定"派生，保证同一玩家在所有客户端渲染一致
+  const seed = player.colorIndex ?? 0;
+  return {
+    skin: SKIN_TONES[seed % SKIN_TONES.length],
+    hair: HAIR_COLORS[seed % HAIR_COLORS.length],
+    shirt: SHIRT_COLORS[seed % SHIRT_COLORS.length],
+    hairStyle: HAIR_STYLES[seed % HAIR_STYLES.length],
+  };
+}
+
+// 生成一个 32x32 像素风格小人头像的 SVG 字符串
+function renderPixelAvatar(player, size = 28) {
+  const { skin, hair, shirt, hairStyle } = getPlayerAppearance(player);
+
+  let hairShape = "";
+  switch (hairStyle) {
+    case "short":
+      hairShape = `<rect x="8" y="4" width="16" height="6" fill="${hair}"/><rect x="6" y="6" width="4" height="6" fill="${hair}"/><rect x="22" y="6" width="4" height="6" fill="${hair}"/>`;
+      break;
+    case "long":
+      hairShape = `<rect x="7" y="4" width="18" height="6" fill="${hair}"/><rect x="6" y="8" width="4" height="14" fill="${hair}"/><rect x="22" y="8" width="4" height="14" fill="${hair}"/>`;
+      break;
+    case "bun":
+      hairShape = `<rect x="8" y="4" width="16" height="6" fill="${hair}"/><rect x="12" y="0" width="8" height="4" fill="${hair}"/>`;
+      break;
+    case "spiky":
+      hairShape = `<rect x="8" y="6" width="3" height="4" fill="${hair}"/><rect x="13" y="2" width="3" height="6" fill="${hair}"/><rect x="18" y="2" width="3" height="6" fill="${hair}"/><rect x="22" y="6" width="3" height="4" fill="${hair}"/><rect x="8" y="8" width="16" height="3" fill="${hair}"/>`;
+      break;
+    case "curly":
+      hairShape = `<rect x="6" y="4" width="20" height="8" fill="${hair}"/><rect x="5" y="8" width="5" height="6" fill="${hair}"/><rect x="22" y="8" width="5" height="6" fill="${hair}"/>`;
+      break;
+    case "bald":
+    default:
+      hairShape = "";
+  }
+
+  return `
+  <svg viewBox="0 0 32 32" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+    <rect x="9" y="9" width="14" height="14" fill="${skin}"/>
+    ${hairShape}
+    <rect x="11" y="15" width="3" height="3" fill="#2A2018"/>
+    <rect x="18" y="15" width="3" height="3" fill="#2A2018"/>
+    <rect x="13" y="20" width="6" height="2" fill="#C9786B"/>
+    <rect x="7" y="23" width="18" height="9" fill="${shirt}"/>
+    <rect x="6" y="24" width="3" height="6" fill="${shirt}"/>
+    <rect x="23" y="24" width="3" height="6" fill="${shirt}"/>
+  </svg>`;
+}
+
+// ---------- 应用状态 ----------
+const App = {
+  screen: "home", // home | create | join | room
+  ws: null,
+  playerId: null,
+  playerName: "",
+  roomId: null,
+  gameState: null,
+  connected: false,
+  reconnectTimer: null,
+  reconnectAttempts: 0,
+};
+
+// ---------- 工具函数 ----------
+function $(sel) { return document.querySelector(sel); }
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  Object.entries(props).forEach(([k, v]) => {
+    if (k === "class") node.className = v;
+    else if (k === "html") node.innerHTML = v;
+    else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v);
+  });
+  (Array.isArray(children) ? children : [children]).forEach((c) => {
+    if (c == null) return;
+    node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  });
+  return node;
+}
+
+function showToast(msg, duration = 2400) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), duration);
+}
+
+function getOrCreatePlayerId() {
+  let pid = localStorage.getItem("monopoly_player_id");
+  if (!pid) {
+    pid = "p_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem("monopoly_player_id", pid);
+  }
+  return pid;
+}
+
+function saveSession(roomId, name) {
+  localStorage.setItem("monopoly_room_id", roomId);
+  localStorage.setItem("monopoly_player_name", name);
+}
+function clearSession() {
+  localStorage.removeItem("monopoly_room_id");
+}
+
+// ---------- WebSocket 连接管理 ----------
+function connectToRoom(roomId, playerName) {
+  if (App.ws) {
+    try { App.ws.close(); } catch (e) {}
+  }
+  App.roomId = roomId;
+  App.playerName = playerName;
+  App.playerId = getOrCreatePlayerId();
+
+  const url = `${WS_URL}/ws/${roomId}?playerId=${encodeURIComponent(App.playerId)}&name=${encodeURIComponent(playerName)}`;
+  const ws = new WebSocket(url);
+  App.ws = ws;
+
+  ws.addEventListener("open", () => {
+    App.connected = true;
+    App.reconnectAttempts = 0;
+    updateConnDot();
+  });
+
+  ws.addEventListener("message", (event) => {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch (e) { return; }
+
+    if (msg.type === "welcome") {
+      App.playerId = msg.playerId;
+      App.gameState = msg.state;
+      saveSession(roomId, playerName);
+      App.screen = "room";
+      render();
+    } else if (msg.type === "state") {
+      const prevPhase = App.gameState?.phase;
+      App.gameState = msg.state;
+      if (App.screen !== "room") { App.screen = "room"; }
+      render();
+      if (prevPhase === "waiting" && msg.state.phase === "playing") {
+        showToast("游戏开始！");
+      }
+    } else if (msg.type === "error") {
+      showToast(msg.message);
+    }
+  });
+
+  ws.addEventListener("close", () => {
+    App.connected = false;
+    updateConnDot();
+    scheduleReconnect();
+  });
+
+  ws.addEventListener("error", () => {
+    App.connected = false;
+    updateConnDot();
+  });
+}
+
+function scheduleReconnect() {
+  if (App.reconnectTimer) return;
+  if (!App.roomId) return;
+  App.reconnectAttempts += 1;
+  const delay = Math.min(1000 * App.reconnectAttempts, 8000);
+  App.reconnectTimer = setTimeout(() => {
+    App.reconnectTimer = null;
+    if (App.roomId && App.screen === "room") {
+      connectToRoom(App.roomId, App.playerName);
+    }
+  }, delay);
+}
+
+function sendAction(type, payload = {}) {
+  if (!App.ws || App.ws.readyState !== WebSocket.OPEN) {
+    showToast("连接已断开，正在重连…");
+    return;
+  }
+  App.ws.send(JSON.stringify({ type, ...payload }));
+}
+
+// 掷骰子专用：先本地播放"滚动"动画再发请求，服务器结果回来后骰子自然"定格"在新数字上
+function rollDiceWithAnimation() {
+  const diceEls = document.querySelectorAll("#dice-display .die");
+  diceEls.forEach((d) => d.classList.add("rolling"));
+  // 短暂延迟后才真正发请求，让滚动动画有时间播放，体验更像真的在掷骰子
+  setTimeout(() => {
+    sendAction("rollDice");
+  }, 500);
+}
+
+function updateConnDot() {
+  const dot = document.querySelector(".conn-dot");
+  if (dot) dot.classList.toggle("offline", !App.connected);
+}
+
+// 心跳：防止部分网络环境下空闲连接被中间设备掐断
+setInterval(() => {
+  if (App.ws && App.ws.readyState === WebSocket.OPEN) {
+    sendAction("ping");
+  }
+}, 25000);
+
+// ---------- API: 创建房间 ----------
+async function apiCreateRoom() {
+  const resp = await fetch(`${BACKEND_URL}/api/create-room`, { method: "POST" });
+  if (!resp.ok) throw new Error("创建房间失败");
+  const data = await resp.json();
+  return data.roomId;
+}
+
+async function apiCheckRoomExists(roomId) {
+  const resp = await fetch(`${BACKEND_URL}/api/room/${roomId}/exists`);
+  if (!resp.ok) return { exists: false };
+  return resp.json();
+}
+
+// ---------- 界面：首页 ----------
+function renderHome(container) {
+  const savedRoom = localStorage.getItem("monopoly_room_id");
+  const savedName = localStorage.getItem("monopoly_player_name") || "";
+
+  const screen = el("div", { class: "screen screen-center" }, [
+    el("div", { class: "logo-title pixel-font" }, "方块地产"),
+    el("div", { class: "logo-sub" }, "和朋友一起联机玩的像素风大富翁"),
+    el("div", { class: "stack" }, [
+      savedRoom
+        ? el("button", { class: "btn btn-primary btn-block", onclick: () => {
+            connectToRoom(savedRoom, savedName);
+          }}, `继续上局游戏（房间 ${savedRoom}）`)
+        : null,
+      el("button", { class: "btn btn-primary btn-block", onclick: () => { App.screen = "create"; render(); } }, "创建房间"),
+      el("button", { class: "btn btn-block", onclick: () => { App.screen = "join"; render(); } }, "加入房间"),
+    ]),
+  ]);
+  container.appendChild(screen);
+}
+
+// ---------- 界面：创建房间 ----------
+function renderCreate(container) {
+  const savedName = localStorage.getItem("monopoly_player_name") || "";
+  const screen = el("div", { class: "screen screen-center" });
+
+  const nameInput = el("input", { class: "input", placeholder: "你的昵称", value: savedName, maxlength: "10" });
+  const createBtn = el("button", { class: "btn btn-primary btn-block" }, "创建并进入");
+  const backBtn = el("button", { class: "btn btn-block", onclick: () => { App.screen = "home"; render(); } }, "返回");
+
+  createBtn.addEventListener("click", async () => {
+    const name = nameInput.value.trim() || "玩家";
+    createBtn.disabled = true;
+    createBtn.textContent = "创建中…";
+    try {
+      const roomId = await apiCreateRoom();
+      connectToRoom(roomId, name);
+    } catch (e) {
+      showToast("创建房间失败，请检查网络后重试");
+      createBtn.disabled = false;
+      createBtn.textContent = "创建并进入";
+    }
+  });
+
+  screen.appendChild(el("div", { class: "logo-title pixel-font", style: "font-size:22px" }, "创建房间"));
+  screen.appendChild(el("div", { class: "stack", style: "margin-top:20px" }, [nameInput, createBtn, backBtn]));
+  container.appendChild(screen);
+}
+
+// ---------- 界面：加入房间 ----------
+function renderJoin(container) {
+  const savedName = localStorage.getItem("monopoly_player_name") || "";
+  const screen = el("div", { class: "screen screen-center" });
+
+  const nameInput = el("input", { class: "input", placeholder: "你的昵称", value: savedName, maxlength: "10" });
+  const roomInput = el("input", { class: "input", placeholder: "房间号（4位）", maxlength: "4", style: "text-transform:uppercase" });
+  const joinBtn = el("button", { class: "btn btn-primary btn-block" }, "加入房间");
+  const backBtn = el("button", { class: "btn btn-block", onclick: () => { App.screen = "home"; render(); } }, "返回");
+
+  roomInput.addEventListener("input", () => {
+    roomInput.value = roomInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  });
+
+  joinBtn.addEventListener("click", async () => {
+    const name = nameInput.value.trim() || "玩家";
+    const roomId = roomInput.value.trim();
+    if (roomId.length !== 4) {
+      showToast("请输入4位房间号");
+      return;
+    }
+    joinBtn.disabled = true;
+    joinBtn.textContent = "加入中…";
+    try {
+      const check = await apiCheckRoomExists(roomId);
+      if (!check.exists) {
+        showToast("房间不存在，请确认房间号");
+        joinBtn.disabled = false;
+        joinBtn.textContent = "加入房间";
+        return;
+      }
+      if (check.phase === "playing" && check.playerCount >= 6) {
+        showToast("房间已满");
+        joinBtn.disabled = false;
+        joinBtn.textContent = "加入房间";
+        return;
+      }
+      connectToRoom(roomId, name);
+    } catch (e) {
+      showToast("加入失败，请检查网络");
+      joinBtn.disabled = false;
+      joinBtn.textContent = "加入房间";
+    }
+  });
+
+  screen.appendChild(el("div", { class: "logo-title pixel-font", style: "font-size:22px" }, "加入房间"));
+  screen.appendChild(el("div", { class: "stack", style: "margin-top:20px" }, [nameInput, roomInput, joinBtn, backBtn]));
+  container.appendChild(screen);
+}
+
+// ---------- 棋盘渲染：40格矩形外圈布局 ----------
+// 布局规则：底边 0-10（从右到左），左边 10-20（从下到上），顶边 20-30（从左到右），右边 30-0（从上到下）
+function getTileGridPosition(tileId) {
+  // 使用 11x11 网格，四角是角格，四边各9个非角格
+  if (tileId <= 10) return { col: 10 - tileId, row: 10 };          // 底边，从右到左
+  if (tileId <= 20) return { col: 0, row: 10 - (tileId - 10) };     // 左边，从下到上
+  if (tileId <= 30) return { col: tileId - 20, row: 0 };            // 顶边，从左到右
+  return { col: 10, row: tileId - 30 };                              // 右边，从上到下
+}
+
+// 格子中心点的百分比坐标（11x11网格，每格约9.0909%），用于棋子绝对定位
+function getTileCenterPercent(tileId) {
+  const { col, row } = getTileGridPosition(tileId);
+  return {
+    leftPct: ((col + 0.5) / 11) * 100,
+    topPct: ((row + 0.5) / 11) * 100,
+  };
+}
+
+function renderBoard(state) {
+  const wrapper = el("div", { class: "board-grid" });
+  const propStates = state.properties;
+
+  BOARD.forEach((tile) => {
+    const { col, row } = getTileGridPosition(tile.id);
+    const isCorner = [0, 10, 20, 30].includes(tile.id);
+    const pState = propStates[tile.id];
+    const owner = pState && pState.ownerId ? state.players.find((p) => p.id === pState.ownerId) : null;
+
+    const cell = el("div", {
+      class: `tile ${isCorner ? "tile-corner" : ""} tile-${tile.type}`,
+      style: `grid-column:${col + 1}; grid-row:${row + 1};`,
+    });
+
+    // 所有权整块染色背景（半透明叠层，一眼看出"这块是谁的"）
+    if (owner) {
+      cell.appendChild(el("div", { class: `tile-owned-bg pc-${owner.colorIndex % 6}` }));
+    }
+
+    if (tile.group) {
+      cell.appendChild(el("div", { class: "tile-colorbar", style: `background:var(${GROUP_COLOR_VAR[tile.group]})` }));
+    }
+
+    if (TILE_ICONS[tile.type]) {
+      cell.appendChild(el("div", { class: "tile-icon" }, TILE_ICONS[tile.type]));
+    }
+
+    cell.appendChild(el("div", { class: "tile-name" }, tile.name));
+
+    if (tile.type === "property" || tile.type === "station" || tile.type === "utility") {
+      cell.appendChild(el("div", { class: "tile-price" }, owner ? "" : `$${tile.price}`));
+      if (pState && pState.houses > 0) {
+        cell.appendChild(el("div", { class: "tile-houses" }, pState.houses === 5 ? "🏨" : "🏠".repeat(pState.houses)));
+      }
+      if (pState && pState.mortgaged) {
+        cell.appendChild(el("div", { class: "tile-mortgaged" }, "已抵押"));
+      }
+    }
+
+    wrapper.appendChild(cell);
+  });
+
+  // 中心区域：骰子展示 + 回合数 + 彩票奖池信息
+  const center = el("div", { class: "board-center", style: "grid-column:2/11; grid-row:2/11;" });
+  const centerInner = el("div", { style: "display:flex; flex-direction:column; align-items:center; gap:8px;" });
+
+  const diceWrap = el("div", { class: "dice-display", id: "dice-display" });
+  diceWrap.appendChild(makeDieEl(state.dice[0]));
+  diceWrap.appendChild(makeDieEl(state.dice[1]));
+  centerInner.appendChild(diceWrap);
+
+  if (state.lottery && state.lottery.pool > 0) {
+    centerInner.appendChild(el("div", { style: "font-size:11px; color:var(--ink-soft); background:white; padding:3px 8px; border-radius:8px; border:1.5px solid var(--panel-border);" }, `🎟️ 彩票奖池 $${state.lottery.pool}`));
+  }
+
+  center.appendChild(centerInner);
+  wrapper.appendChild(center);
+
+  // 棋子层：独立绝对定位，叠加在 board-area 上（不在 board-grid 内部），用于平滑滑动动画
+  const boardArea = el("div", { class: "board-area" }, [wrapper]);
+  const tokenLayer = el("div", { class: "token-layer", id: "token-layer" });
+  boardArea.appendChild(tokenLayer);
+
+  renderTokens(state, tokenLayer);
+
+  return boardArea;
+}
+
+function makeDieEl(value) {
+  const die = el("div", { class: value > 0 ? "die settled" : "die" }, [
+    el("div", { class: "die-face" }, value > 0 ? String(value) : "?"),
+  ]);
+  return die;
+}
+
+// 棋子渲染：同格多个玩家时，按小圆环方式错开排布，避免完全重叠
+function renderTokens(state, layer) {
+  const tilePlayers = {}; // tileId -> [players]
+  state.players.forEach((p) => {
+    if (p.bankrupt) return;
+    tilePlayers[p.position] = tilePlayers[p.position] || [];
+    tilePlayers[p.position].push(p);
+  });
+
+  Object.entries(tilePlayers).forEach(([tileId, players]) => {
+    const { leftPct, topPct } = getTileCenterPercent(Number(tileId));
+    const n = players.length;
+    players.forEach((p, idx) => {
+      // 多人同格时，围绕格子中心做小幅度偏移，避免完全重叠看不清
+      const offsetAngle = (idx / Math.max(n, 1)) * 2 * Math.PI;
+      const offsetRadius = n > 1 ? 2.2 : 0;
+      const left = leftPct + Math.cos(offsetAngle) * offsetRadius;
+      const top = topPct + Math.sin(offsetAngle) * offsetRadius;
+
+      const existing = document.getElementById(`token-${p.id}`);
+      const tokenEl = el("div", {
+        id: `token-${p.id}`,
+        class: "token-moving",
+        style: `left:${left}%; top:${top}%; width:22px; height:22px;`,
+        title: p.name,
+      });
+      tokenEl.innerHTML = renderPixelAvatar(p, 22);
+      tokenEl.style.border = "2px solid var(--ink)";
+      tokenEl.style.borderRadius = "50%";
+      tokenEl.style.overflow = "hidden";
+      tokenEl.style.background = "white";
+      tokenEl.style.boxShadow = "1px 1px 0 var(--ink)";
+      layer.appendChild(tokenEl);
+    });
+  });
+}
+
+function renderWaitingRoom(container) {
+  const state = App.gameState;
+  const screen = el("div", { class: "screen screen-center" });
+
+  const isHost = state.players[0]?.id === App.playerId;
+
+  screen.appendChild(el("div", { class: "logo-sub" }, "房间号"));
+  screen.appendChild(el("div", { class: "pixel-font", style: "font-size:40px; letter-spacing:6px; color:var(--accent-deep); margin-bottom:6px;" }, App.roomId));
+  screen.appendChild(el("button", { class: "btn", style: "margin-bottom:24px; font-size:13px;", onclick: () => {
+    const link = `${location.origin}${location.pathname}?room=${App.roomId}`;
+    if (navigator.share) {
+      navigator.share({ title: "来一起玩方块地产", text: `房间号 ${App.roomId}`, url: link }).catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(link);
+      showToast("链接已复制，发给朋友吧");
+    }
+  }}, "📋 分享房间链接给朋友"));
+
+  const playerList = el("div", { class: "card", style: "width:100%; max-width:340px; margin-bottom:20px;" }, [
+    el("div", { style: "font-weight:800; margin-bottom:10px;" }, `玩家（${state.players.length}/6）`),
+    ...state.players.map((p) => {
+      const avatarWrap = el("span", { style: "display:inline-flex; width:26px; height:26px; border-radius:50%; overflow:hidden; border:2px solid var(--ink); flex-shrink:0;" });
+      avatarWrap.innerHTML = renderPixelAvatar(p, 26);
+      return el("div", { class: "row", style: "padding:6px 0;" }, [
+        avatarWrap,
+        el("span", {}, p.name + (p.id === App.playerId ? "（你）" : "")),
+        el("span", { class: "conn-dot" + (p.connected ? "" : " offline"), style: "margin-left:auto;" }),
+      ]);
+    }),
+  ]);
+  screen.appendChild(playerList);
+
+  if (isHost) {
+    const startBtn = el("button", {
+      class: "btn btn-primary btn-block",
+      style: "max-width:340px;",
+      onclick: () => sendAction("startGame"),
+    }, state.players.length < 2 ? "等待玩家加入（至少2人）" : "开始游戏");
+    if (state.players.length < 2) startBtn.disabled = true;
+    screen.appendChild(startBtn);
+  } else {
+    screen.appendChild(el("div", { style: "color:var(--ink-soft); font-size:14px;" }, "等待房主开始游戏…"));
+  }
+
+  container.appendChild(screen);
+}
+
+// ---------- 界面：游戏进行中 ----------
+function renderGamePlaying(container) {
+  const state = App.gameState;
+
+  const wrap = el("div", { class: "game-wrap" });
+  wrap.appendChild(buildPlayerStrip(state));
+
+  const boardArea = renderBoard(state);
+  boardArea.id = "board-area-root";
+  wrap.appendChild(boardArea);
+
+  wrap.appendChild(buildTurnBanner(state));
+  wrap.appendChild(buildActionPanel(state));
+  wrap.appendChild(el("div", { class: "card", style: "margin-top:10px;" }, [
+    el("div", { style: "font-weight:800; margin-bottom:6px; font-size:13px;" }, "动态"),
+    buildLogBox(state),
+  ]));
+
+  container.appendChild(wrap);
+}
+
+function buildPlayerStrip(state) {
+  const cp = state.players[state.currentPlayerIndex];
+  const playerStrip = el("div", { class: "player-strip" });
+  state.players.forEach((p) => {
+    const avatarWrap = el("div", { style: "width:22px; height:22px; border-radius:50%; overflow:hidden; border:2px solid var(--ink); flex-shrink:0;" });
+    avatarWrap.innerHTML = renderPixelAvatar(p, 22);
+    playerStrip.appendChild(el("div", {
+      class: `player-chip ${p.id === cp.id ? "player-chip-active" : ""} ${p.bankrupt ? "player-chip-bankrupt" : ""}`,
+    }, [
+      avatarWrap,
+      el("div", { class: "player-chip-info" }, [
+        el("div", { class: "player-chip-name" }, p.name + (p.id === App.playerId ? "（你）" : "")),
+        el("div", { class: "player-chip-cash" }, p.bankrupt ? "破产" : `$${p.cash}`),
+      ]),
+      !p.connected ? el("span", { class: "conn-dot offline", style: "margin-left:4px;" }) : null,
+    ]));
+  });
+  return playerStrip;
+}
+
+function buildTurnBanner(state) {
+  const cp = state.players[state.currentPlayerIndex];
+  const me = state.players.find((p) => p.id === App.playerId);
+  const isMyTurn = cp && cp.id === App.playerId && !me?.bankrupt;
+  return el("div", { class: "turn-banner " + (isMyTurn ? "turn-banner-mine" : "") },
+    isMyTurn ? "🎲 轮到你了" : `等待 ${cp.name} 操作…`
+  );
+}
+
+function buildActionPanel(state) {
+  const me = state.players.find((p) => p.id === App.playerId);
+  const cp = state.players[state.currentPlayerIndex];
+  const isMyTurn = cp && cp.id === App.playerId && !me?.bankrupt;
+  const panel = el("div", { class: "action-panel" });
+
+  if (!isMyTurn) {
+    panel.appendChild(el("div", { style: "text-align:center; color:var(--ink-soft); padding:14px;" }, [
+      el("div", { class: "spinner", style: "margin: 0 auto 8px;" }),
+    ]));
+    return panel;
+  }
+
+  if (me.inJail && state.turnSubPhase === "rolling") {
+    panel.appendChild(el("div", { class: "card", style: "margin-bottom:10px; text-align:center;" }, `你在监狱中（第 ${me.jailTurns + 1}/3 轮）`));
+    const row = el("div", { class: "row" });
+    row.appendChild(el("button", { class: "btn btn-primary", style: "flex:1;", onclick: () => rollDiceWithAnimation() }, "掷骰子越狱"));
+    if (me.cash >= 50) {
+      row.appendChild(el("button", { class: "btn", style: "flex:1;", onclick: () => sendAction("payJailFine") }, "付$50出狱"));
+    }
+    if (me.getOutOfJailCards > 0) {
+      row.appendChild(el("button", { class: "btn", style: "flex:1;", onclick: () => sendAction("useJailCard") }, "用出狱卡"));
+    }
+    panel.appendChild(row);
+  } else if (me.inHospital && state.turnSubPhase === "rolling") {
+    panel.appendChild(el("div", { class: "card", style: "text-align:center;" }, `🏥 住院中（第 ${me.hospitalTurns + 1}/2 轮），无法行动`));
+    panel.appendChild(el("button", { class: "btn btn-block", style: "margin-top:8px;", onclick: () => sendAction("rollDice") }, "确认（跳过本回合）"));
+  } else if (state.turnSubPhase === "rolling") {
+    panel.appendChild(el("button", { class: "btn btn-primary btn-block", onclick: () => rollDiceWithAnimation() }, "🎲 掷骰子"));
+  } else if (state.turnSubPhase === "awaitingBuy" && state.pendingDecision) {
+    const tile = BOARD[state.pendingDecision.tileId];
+    panel.appendChild(el("div", { class: "card", style: "margin-bottom:10px; text-align:center;" }, `购买【${tile.name}】？ $${tile.price}`));
+    const row = el("div", { class: "row" });
+    row.appendChild(el("button", { class: "btn btn-success", style: "flex:1;", onclick: () => sendAction("buyProperty", { buy: true }) }, "购买"));
+    row.appendChild(el("button", { class: "btn btn-danger", style: "flex:1;", onclick: () => sendAction("buyProperty", { buy: false }) }, "放弃"));
+    panel.appendChild(row);
+  } else if (state.turnSubPhase === "awaitingBank" && state.pendingDecision) {
+    panel.appendChild(buildBankPanel(me));
+  } else if (state.turnSubPhase === "awaitingLottery" && state.pendingDecision) {
+    panel.appendChild(buildLotteryPanel(me));
+  }
+
+  const buildableTiles = BOARD.filter((t) => t.type === "property" && state.properties[t.id]?.ownerId === App.playerId);
+  if (buildableTiles.length > 0 && state.turnSubPhase === "rolling") {
+    panel.appendChild(el("button", { class: "btn btn-block", style: "margin-top:10px; font-size:13px;", onclick: () => openBuildModal(state) }, "🏠 管理地产 / 建房"));
+  }
+
+  return panel;
+}
+
+// ---------- 银行操作面板 ----------
+function buildBankPanel(me) {
+  const wrap = el("div", { class: "card" });
+  wrap.appendChild(el("div", { style: "font-weight:800; margin-bottom:8px;" }, "🏦 银行"));
+  wrap.appendChild(el("div", { style: "font-size:13px; color:var(--ink-soft); margin-bottom:10px;" },
+    `存款余额: $${me.bankDeposit}　贷款余额: $${me.bankLoan}`
+  ));
+
+  const depositInput = el("input", { class: "input", type: "number", placeholder: "存款金额", style: "margin-bottom:6px;" });
+  const depositRow = el("div", { class: "row", style: "margin-bottom:10px;" }, [
+    depositInput,
+    el("button", { class: "btn btn-success", style: "white-space:nowrap;", onclick: () => {
+      const amt = parseInt(depositInput.value, 10);
+      if (amt > 0) sendAction("bankDeposit", { amount: amt });
+    }}, "存款"),
+  ]);
+  wrap.appendChild(depositRow);
+
+  if (me.bankDeposit > 0) {
+    wrap.appendChild(el("button", { class: "btn btn-block", style: "margin-bottom:10px;", onclick: () => sendAction("bankWithdraw") }, `取出全部存款（含5%利息）`));
+  }
+
+  if (me.bankLoan === 0) {
+    const loanInput = el("input", { class: "input", type: "number", placeholder: "贷款金额", style: "margin-bottom:6px;" });
+    const loanRow = el("div", { class: "row", style: "margin-bottom:10px;" }, [
+      loanInput,
+      el("button", { class: "btn", style: "white-space:nowrap;", onclick: () => {
+        const amt = parseInt(loanInput.value, 10);
+        if (amt > 0) sendAction("bankLoan", { amount: amt });
+      }}, "贷款"),
+    ]);
+    wrap.appendChild(loanRow);
+    wrap.appendChild(el("div", { style: "font-size:11px; color:var(--ink-soft); margin-bottom:10px;" }, "贷款需在12轮内还清，到期未还自动扣现金，含10%利息"));
+  } else {
+    wrap.appendChild(el("button", { class: "btn btn-block", style: "margin-bottom:10px;", onclick: () => sendAction("bankRepay") }, `还清贷款 $${me.bankLoan}`));
+  }
+
+  wrap.appendChild(el("button", { class: "btn btn-block", onclick: () => sendAction("bankLeave") }, "离开银行"));
+  return wrap;
+}
+
+// ---------- 彩票操作面板 ----------
+function buildLotteryPanel(me) {
+  const wrap = el("div", { class: "card" });
+  wrap.appendChild(el("div", { style: "font-weight:800; margin-bottom:8px;" }, "🎟️ 彩票站"));
+  wrap.appendChild(el("div", { style: "font-size:13px; color:var(--ink-soft); margin-bottom:10px;" }, "花费 $50 选一个号码（1-6），每8轮开奖一次，中奖平分奖池"));
+
+  const numberRow = el("div", { class: "row", style: "flex-wrap:wrap; gap:6px; margin-bottom:10px;" });
+  for (let n = 1; n <= 6; n++) {
+    numberRow.appendChild(el("button", {
+      class: "btn",
+      style: "flex:1; min-width:40px; padding:10px 6px;",
+      onclick: () => sendAction("lotteryBuy", { number: n }),
+    }, String(n)));
+  }
+  wrap.appendChild(numberRow);
+  wrap.appendChild(el("button", { class: "btn btn-block", onclick: () => sendAction("lotterySkip") }, "不买，离开"));
+  return wrap;
+}
+
+function buildLogBox(state) {
+  const logBox = el("div", { class: "log-box" });
+  state.log.slice(-12).reverse().forEach((l) => {
+    logBox.appendChild(el("div", { class: "log-line" }, l.text));
+  });
+  return logBox;
+}
+
+// ---------- 建房弹窗 ----------
+function openBuildModal(state) {
+  const myGroups = {};
+  BOARD.forEach((t) => {
+    if (t.type === "property" && state.properties[t.id]?.ownerId === App.playerId) {
+      myGroups[t.group] = myGroups[t.group] || [];
+      myGroups[t.group].push(t);
+    }
+  });
+
+  const overlay = el("div", { class: "modal-overlay", onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
+  const modal = el("div", { class: "modal-box card" });
+  modal.appendChild(el("div", { style: "font-weight:800; margin-bottom:12px;" }, "建房"));
+
+  Object.entries(myGroups).forEach(([group, tiles]) => {
+    const fullGroup = tiles.length === BOARD.filter((t) => t.group === group).length;
+    tiles.forEach((tile) => {
+      const pState = state.properties[tile.id];
+      const row = el("div", { class: "row-between", style: "padding:8px 0; border-bottom:2px solid var(--panel-border);" }, [
+        el("div", {}, [
+          el("div", { style: "font-weight:700;" }, tile.name),
+          el("div", { style: "font-size:12px; color:var(--ink-soft);" }, `房屋: ${pState.houses}/5  造价: $${tile.houseCost || 50}`),
+        ]),
+        el("button", {
+          class: "btn btn-primary",
+          style: "padding:8px 14px; font-size:13px;",
+          onclick: () => { sendAction("buildHouse", { tileId: tile.id }); overlay.remove(); },
+        }, "+建造"),
+      ]);
+      if (!fullGroup || pState.houses >= 5) {
+        row.querySelector("button").disabled = true;
+      }
+      modal.appendChild(row);
+    });
+  });
+
+  modal.appendChild(el("button", { class: "btn btn-block", style: "margin-top:14px;", onclick: () => overlay.remove() }, "关闭"));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+// ---------- 界面：游戏结束 ----------
+function renderGameEnded(container) {
+  const state = App.gameState;
+  const winner = state.players.find((p) => p.id === state.winnerId);
+  const screen = el("div", { class: "screen screen-center" });
+
+  screen.appendChild(el("div", { class: "pixel-font", style: "font-size:24px; margin-bottom:12px;" }, "🏆 游戏结束"));
+  screen.appendChild(el("div", { style: "font-size:18px; font-weight:800; color:var(--accent-deep); margin-bottom:24px;" },
+    winner ? `${winner.name} 获胜！` : "游戏结束"
+  ));
+
+  const ranking = [...state.players].sort((a, b) => b.cash - a.cash);
+  screen.appendChild(el("div", { class: "card", style: "width:100%; max-width:320px; margin-bottom:24px;" },
+    ranking.map((p, i) => el("div", { class: "row-between", style: "padding:6px 0;" }, [
+      el("span", {}, `${i + 1}. ${p.name}`),
+      el("span", {}, p.bankrupt ? "破产" : `$${p.cash}`),
+    ]))
+  ));
+
+  screen.appendChild(el("button", { class: "btn btn-primary btn-block", style: "max-width:320px;", onclick: () => {
+    clearSession();
+    App.roomId = null;
+    if (App.ws) App.ws.close();
+    App.screen = "home";
+    render();
+  }}, "返回首页"));
+
+  container.appendChild(screen);
+}
+
+// ---------- 主渲染调度 ----------
+function render() {
+  const app = $("#app");
+
+  // 游戏进行中：复用已存在的棋盘容器，只做增量更新，保证棋子滑动动画生效
+  if (App.screen === "room" && App.gameState && App.gameState.phase === "playing") {
+    const existingBoardArea = document.getElementById("board-area-root");
+    if (existingBoardArea) {
+      updateGamePlayingIncremental();
+      return;
+    }
+  }
+
+  app.innerHTML = "";
+
+  if (App.screen === "room" && App.gameState) {
+    const top = el("div", { class: "topbar" }, [
+      el("div", { class: "topbar-title" }, [
+        el("span", { class: "conn-dot" + (App.connected ? "" : " offline") }),
+        `房间 ${App.roomId}`,
+      ]),
+      el("button", { class: "btn", style: "padding:6px 10px; font-size:12px;", onclick: () => {
+        if (confirm("确定退出房间吗？退出后可凭房间号重新加入。")) {
+          clearSession();
+          App.roomId = null;
+          if (App.ws) App.ws.close();
+          App.screen = "home";
+          render();
+        }
+      }}, "退出"),
+    ]);
+    app.appendChild(top);
+
+    const body = el("div", { style: "flex:1; overflow-y:auto; display:flex; flex-direction:column;" });
+    app.appendChild(body);
+
+    if (App.gameState.phase === "waiting") {
+      renderWaitingRoom(body);
+    } else if (App.gameState.phase === "playing") {
+      renderGamePlaying(body);
+    } else if (App.gameState.phase === "ended") {
+      renderGameEnded(body);
+    }
+    return;
+  }
+
+  if (App.screen === "create") return renderCreate(app);
+  if (App.screen === "join") return renderJoin(app);
+  renderHome(app);
+}
+
+// 游戏进行中的增量更新：只替换玩家条/操作面板/日志，棋盘格子整体刷新（变化不频繁），
+// 但棋子层做"移动现有元素"而非"重建"，从而让 CSS transition 动画生效
+function updateGamePlayingIncremental() {
+  const state = App.gameState;
+
+  // 1. 更新棋盘格子内容（所有权染色、房屋数等）—— 格子本身重建不影响棋子动画，因为棋子在独立层
+  const oldBoardGrid = document.querySelector("#board-area-root .board-grid");
+  if (oldBoardGrid) {
+    const newBoardArea = renderBoard(state);
+    const newGrid = newBoardArea.querySelector(".board-grid");
+    oldBoardGrid.replaceWith(newGrid);
+  }
+
+  // 2. 棋子层：增量移动已存在的棋子元素到新位置（触发transition），新玩家则新建
+  const tokenLayer = document.getElementById("token-layer");
+  if (tokenLayer) {
+    updateTokenPositions(state, tokenLayer);
+  }
+
+  // 3. 顶部玩家资产条、操作面板、日志：直接重建（变化频繁但本身不需要动画）
+  const playerStripOld = document.querySelector(".player-strip");
+  if (playerStripOld) {
+    const newStrip = buildPlayerStrip(state);
+    playerStripOld.replaceWith(newStrip);
+  }
+
+  const turnBannerOld = document.querySelector(".turn-banner");
+  if (turnBannerOld) {
+    const newBanner = buildTurnBanner(state);
+    turnBannerOld.replaceWith(newBanner);
+  }
+
+  const actionPanelOld = document.querySelector(".action-panel");
+  if (actionPanelOld) {
+    const newPanel = buildActionPanel(state);
+    actionPanelOld.replaceWith(newPanel);
+  }
+
+  const logBoxOld = document.querySelector(".log-box");
+  if (logBoxOld) {
+    const newLog = buildLogBox(state);
+    logBoxOld.replaceWith(newLog);
+  }
+}
+
+// 增量移动棋子：已存在的token元素只更新left/top（触发CSS transition滑动），不存在则新建
+function updateTokenPositions(state, layer) {
+  const alivePlayers = state.players.filter((p) => !p.bankrupt);
+  const tilePlayers = {};
+  alivePlayers.forEach((p) => {
+    tilePlayers[p.position] = tilePlayers[p.position] || [];
+    tilePlayers[p.position].push(p);
+  });
+
+  const seenIds = new Set();
+
+  Object.entries(tilePlayers).forEach(([tileId, players]) => {
+    const { leftPct, topPct } = getTileCenterPercent(Number(tileId));
+    const n = players.length;
+    players.forEach((p, idx) => {
+      seenIds.add(p.id);
+      const offsetAngle = (idx / Math.max(n, 1)) * 2 * Math.PI;
+      const offsetRadius = n > 1 ? 2.2 : 0;
+      const left = leftPct + Math.cos(offsetAngle) * offsetRadius;
+      const top = topPct + Math.sin(offsetAngle) * offsetRadius;
+
+      let tokenEl = document.getElementById(`token-${p.id}`);
+      if (tokenEl) {
+        // 已存在：只改变位置触发 transition 动画
+        const movedDistance = Math.abs(parseFloat(tokenEl.style.left) - left) + Math.abs(parseFloat(tokenEl.style.top) - top);
+        tokenEl.style.left = `${left}%`;
+        tokenEl.style.top = `${top}%`;
+        if (movedDistance > 0.5) {
+          tokenEl.classList.remove("token-bounce");
+          // 触发重排后再加class，确保动画能重新播放
+          requestAnimationFrame(() => tokenEl.classList.add("token-bounce"));
+        }
+      } else {
+        // 新建（首次出现，如刚加入游戏）
+        tokenEl = el("div", {
+          id: `token-${p.id}`,
+          class: "token-moving",
+          style: `left:${left}%; top:${top}%; width:22px; height:22px;`,
+          title: p.name,
+        });
+        tokenEl.innerHTML = renderPixelAvatar(p, 22);
+        tokenEl.style.border = "2px solid var(--ink)";
+        tokenEl.style.borderRadius = "50%";
+        tokenEl.style.overflow = "hidden";
+        tokenEl.style.background = "white";
+        tokenEl.style.boxShadow = "1px 1px 0 var(--ink)";
+        layer.appendChild(tokenEl);
+      }
+    });
+  });
+
+  // 清理已破产/已离场玩家的棋子元素
+  layer.querySelectorAll(".token-moving").forEach((el) => {
+    const pid = el.id.replace("token-", "");
+    if (!seenIds.has(pid)) el.remove();
+  });
+}
+
+// ---------- 初始化 ----------
+function init() {
+  // 处理分享链接中的房间号参数
+  const urlParams = new URLSearchParams(location.search);
+  const roomFromUrl = urlParams.get("room");
+
+  if (roomFromUrl) {
+    App.screen = "join";
+    render();
+    setTimeout(() => {
+      const roomInput = document.querySelector('input[placeholder="房间号（4位）"]');
+      if (roomInput) roomInput.value = roomFromUrl.toUpperCase();
+    }, 0);
+    return;
+  }
+
+  render();
+
+  // 注册 Service Worker（独立 sw.js 文件，与本页面同源部署；详见部署说明）
+  // 注：浏览器禁止用 Blob/跨域 URL 注册 Service Worker，必须是同源的真实文件，
+  // 所以本项目附带一个独立的 sw.js，部署时把它和 index.html 放在同一目录即可。
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      // 找不到 sw.js 不影响游戏功能，只是没有离线外壳缓存
+    });
+  }
+}
+
+init();
+
+</script>
+</body>
+</html>
