@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#FAF6F0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -47,15 +47,35 @@
     overscroll-behavior: none;
     height: 100%;
     width: 100%;
-    position: fixed;
     overflow: hidden;
   }
 
+  /* 桌面端：#app 限制最大宽度并居中，避免在宽屏上无限拉伸导致元素比例失衡；
+     手机端：屏幕本身就窄，#app 自然铺满全宽，效果跟之前一致 */
   #app {
     width: 100%;
-    height: 100%;
+    max-width: 720px;
+    height: 100vh;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
+    background: var(--bg);
+    position: relative;
+    box-shadow: 0 0 0 1px var(--panel-border);
+  }
+
+  /* 桌面端（屏幕较宽时）给背景加一点呼吸感，不让内容贴边贴到浏览器边框 */
+  @media (min-width: 760px) {
+    body {
+      display: flex;
+      justify-content: center;
+      background: linear-gradient(135deg, #F0E8DC, #FAF6F0);
+    }
+    #app {
+      max-width: 760px;
+      height: 100vh;
+      box-shadow: 0 0 40px rgba(74, 55, 40, 0.15);
+    }
   }
 
   .pixel-font {
@@ -256,11 +276,23 @@
   .player-chip-cash { font-size: 12px; font-weight: 800; color: var(--accent-deep); }
 
   /* 棋盘：11x11 网格，外圈40格+中心信息区 */
-  .board-area {
+  /* 镜头跟随：外层视窗固定大小+裁切溢出，内层棋盘用transform做缩放平移跟随当前玩家位置 */
+  .board-viewport {
     width: 100%;
     aspect-ratio: 1 / 1;
     max-width: 100%;
+    overflow: hidden;
+    position: relative;
+    border-radius: var(--radius-m);
+  }
+  .board-area {
+    width: 100%;
+    height: 100%;
     position: relative; /* 棋子用绝对定位叠加在棋盘上方，独立于格子DOM做滑动动画 */
+    container-type: inline-size; /* 关键：让子元素可用 cqw 单位按本容器宽度缩放，不再受限于视口绝对像素 */
+    container-name: boardarea;
+    transition: transform 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+    transform-origin: center center;
   }
   .board-grid {
     display: grid;
@@ -273,6 +305,20 @@
     overflow: hidden;
     background: var(--panel);
     position: relative;
+  }
+
+  .camera-reset-btn {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    z-index: 50;
+    background: rgba(74,55,40,0.85);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-size: 11px;
+    cursor: pointer;
   }
 
   /* 棋子层：绝对定位覆盖在棋盘上，用left/top的transition实现滑动跳格效果 */
@@ -303,31 +349,41 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    font-size: 6.5px;
-    padding: 2px 1px;
+    font-size: 1.7cqw;
+    padding: 0.3cqw 0.2cqw;
     overflow: hidden;
     background: var(--panel);
   }
   .tile-corner {
     background: var(--bg);
-    font-size: 7.5px;
+    font-size: 2cqw;
     font-weight: 800;
     align-items: center;
     justify-content: center;
     text-align: center;
   }
-  .tile-colorbar { width: 100%; height: 6px; flex-shrink: 0; margin-bottom: 1px; }
+  .tile-colorbar { width: 100%; height: 1.4cqw; flex-shrink: 0; margin-bottom: 0.2cqw; }
   .tile-name {
     font-weight: 700;
     text-align: center;
     line-height: 1.05;
     word-break: break-all;
     color: var(--ink);
+    position: relative;
+    z-index: 2;
+    text-shadow: 0 0 3px rgba(255,255,255,0.9), 0 0 3px rgba(255,255,255,0.9);
   }
-  .tile-price { font-size: 6px; color: var(--ink-soft); margin-top: auto; }
-  .tile-owner-bar { width: 80%; height: 3px; border-radius: 2px; margin-top: 2px; }
-  .tile-houses { font-size: 6px; margin-top: 1px; line-height: 1; }
-  .tile-mortgaged { font-size: 5px; color: var(--danger); }
+  .tile-price {
+    font-size: 1.5cqw;
+    color: var(--ink-soft);
+    margin-top: auto;
+    position: relative;
+    z-index: 2;
+    text-shadow: 0 0 3px rgba(255,255,255,0.9);
+  }
+  .tile-owner-bar { width: 80%; height: 0.8cqw; border-radius: 2px; margin-top: 0.3cqw; }
+  .tile-houses { font-size: 1.6cqw; margin-top: 0.2cqw; line-height: 1; position: relative; z-index: 2; }
+  .tile-mortgaged { font-size: 1.3cqw; color: var(--danger); position: relative; z-index: 2; }
   .tile-tokens {
     position: absolute;
     bottom: 1px; right: 1px;
@@ -335,8 +391,9 @@
     flex-wrap: wrap;
     gap: 1px;
     max-width: 90%;
+    z-index: 3;
   }
-  .tile-tokens .token { width: 10px; height: 10px; font-size: 5px; border-width: 1px; }
+  .tile-tokens .token { width: 2.4cqw; height: 2.4cqw; font-size: 1.2cqw; border-width: 1px; }
 
   .tile-go { background: #FFF3E0; }
   .tile-jail { background: #ECECEC; }
@@ -349,17 +406,27 @@
   .tile-station { background: #ECEFF9; }
   .tile-utility { background: #E8F5F0; }
 
-  .tile-icon { font-size: 11px; line-height: 1; margin-bottom: 1px; }
-  .tile-corner .tile-icon { font-size: 16px; }
+  .tile-icon { font-size: 2.6cqw; line-height: 1; margin-bottom: 0.2cqw; position: relative; z-index: 2; }
+  .tile-corner .tile-icon { font-size: 4cqw; }
+
+  /* 填满格子的像素插画层：每个地块独立绘制的SVG背景图，铺满整格，z-index在文字之下 */
+  .tile-art {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    opacity: 0.9;
+  }
+  .tile-art svg { width: 100%; height: 100%; display: block; }
 
   /* 所有权染色：整块格子背景变为玩家主题色的淡化版本，一眼看出归属 */
   .tile-owned-bg {
     position: absolute;
     inset: 0;
-    opacity: 0.32;
-    z-index: 0;
+    opacity: 0.38;
+    z-index: 2;
   }
-  .tile > * { position: relative; z-index: 1; }
+  .tile > * { position: relative; }
+  .tile-art, .tile-owned-bg { position: absolute; }
 
   .board-center {
     display: flex;
@@ -458,11 +525,40 @@
     max-height: 80vh;
     overflow-y: auto;
   }
+  /* 掷骰子大字播报浮层 */
+  #dice-announce-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: rgba(74, 55, 40, 0.92);
+    color: white;
+    padding: 16px 28px;
+    border-radius: var(--radius-l);
+    font-size: 17px;
+    font-weight: 800;
+    text-align: center;
+    z-index: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    max-width: 80%;
+  }
+  #dice-announce-overlay.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  #dice-announce-overlay .announce-dice {
+    font-size: 26px;
+    margin-top: 4px;
+  }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <div id="toast"></div>
+<div id="dice-announce-overlay"></div>
 
 <script>
 // ============================================================
@@ -523,7 +619,103 @@ const GROUP_COLOR_VAR = {
   red: "--g-red", yellow: "--g-yellow", green: "--g-green", darkblue: "--g-darkblue",
 };
 
-// ---------- 格子类型图标（用于棋盘格子小图标显示）----------
+// ---------- 格子像素插画生成系统 ----------
+// 每种地块类型独立设计构图，用 SVG 在 0-32 viewBox 网格上绘制，填满整个格子背景。
+// 同主题地块（如地产组内的多块地）共享构图但按 group 配色微调，保证视觉统一又有变化。
+function renderTileArt(tile) {
+  const groupColor = tile.group ? `var(${GROUP_COLOR_VAR[tile.group]})` : "#CBB89A";
+  switch (tile.type) {
+    case "go":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#FFE9C7"/>
+        <rect x="4" y="6" width="3" height="22" fill="#4A3728"/>
+        <polygon points="7,6 26,10 7,16" fill="#D9534F"/>
+        <rect x="2" y="27" width="10" height="3" fill="#8A7A6B"/>
+      </svg>`;
+    case "jail":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#D8D2C8"/>
+        <rect x="4" y="8" width="24" height="20" fill="#9C9285"/>
+        <rect x="6" y="10" width="3" height="16" fill="#3A332C"/>
+        <rect x="11" y="10" width="3" height="16" fill="#3A332C"/>
+        <rect x="16" y="10" width="3" height="16" fill="#3A332C"/>
+        <rect x="21" y="10" width="3" height="16" fill="#3A332C"/>
+        <rect x="26" y="10" width="3" height="16" fill="#3A332C"/>
+        <rect x="2" y="6" width="28" height="3" fill="#6B6358"/>
+      </svg>`;
+    case "freeparking":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#E8F5EA"/>
+        <polygon points="16,4 30,14 26,14 26,28 6,28 6,14 2,14" fill="#6FB87F"/>
+        <rect x="13" y="19" width="6" height="9" fill="#8D5B3F"/>
+        <circle cx="9" cy="11" r="2" fill="#E8C547"/>
+        <circle cx="23" cy="11" r="2" fill="#E8C547"/>
+      </svg>`;
+    case "gotojail":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#FBDADA"/>
+        <polygon points="16,3 29,26 3,26" fill="#D9534F"/>
+        <rect x="14.5" y="11" width="3" height="8" fill="#FFF"/>
+        <rect x="14.5" y="20.5" width="3" height="3" fill="#FFF"/>
+      </svg>`;
+    case "tax":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#FFF6DC"/>
+        <rect x="7" y="6" width="18" height="22" rx="1" fill="#FAFAF4" stroke="#C9A24A" stroke-width="1.5"/>
+        <rect x="10" y="11" width="12" height="2" fill="#C9A24A"/>
+        <rect x="10" y="15" width="12" height="2" fill="#C9A24A"/>
+        <rect x="10" y="19" width="8" height="2" fill="#C9A24A"/>
+        <circle cx="22" cy="23" r="4" fill="#E8C547" stroke="#9C7A1F"/>
+        <text x="22" y="25.5" font-size="5" text-anchor="middle" fill="#6B4F12">$</text>
+      </svg>`;
+    case "card":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="${tile.deck === 'chance' ? '#F3EEFB' : '#EAF1FB'}"/>
+        <rect x="8" y="4" width="13" height="19" rx="1.5" fill="#FFF" stroke="#4A3728" stroke-width="1.3" transform="rotate(-8 14 13)"/>
+        <rect x="12" y="9" width="13" height="19" rx="1.5" fill="${tile.deck === 'chance' ? '#C9A0DC' : '#7EC8E3'}" stroke="#4A3728" stroke-width="1.3" transform="rotate(6 18 18)"/>
+        <text x="18" y="22" font-size="9" text-anchor="middle" fill="#FFF" font-weight="bold" transform="rotate(6 18 18)">${tile.deck === "chance" ? "?" : "★"}</text>
+      </svg>`;
+    case "station":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#E4E9F7"/>
+        <rect x="4" y="14" width="24" height="12" fill="#7E8AA8"/>
+        <polygon points="4,14 16,5 28,14" fill="#5A6480"/>
+        <rect x="7" y="18" width="4" height="5" fill="#FFF6DC"/>
+        <rect x="14" y="18" width="4" height="5" fill="#FFF6DC"/>
+        <rect x="21" y="18" width="4" height="5" fill="#FFF6DC"/>
+        <rect x="2" y="26" width="28" height="2.5" fill="#3A3F50"/>
+      </svg>`;
+    case "utility":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#E5F6EE"/>
+        <polygon points="19,4 10,18 15,18 12,29 23,14 17,14" fill="#E8C547" stroke="#9C7A1F" stroke-width="0.8"/>
+      </svg>`;
+    case "bank":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#FFF6DC"/>
+        <polygon points="16,4 28,11 4,11" fill="#C9A24A"/>
+        <rect x="4" y="11" width="24" height="2" fill="#9C7A1F"/>
+        <rect x="6" y="13" width="3" height="11" fill="#E8C547"/>
+        <rect x="11" y="13" width="3" height="11" fill="#E8C547"/>
+        <rect x="16.5" y="13" width="3" height="11" fill="#E8C547"/>
+        <rect x="22" y="13" width="3" height="11" fill="#E8C547"/>
+        <rect x="3" y="24" width="26" height="3" fill="#9C7A1F"/>
+      </svg>`;
+    case "lottery":
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#FCE4EC"/>
+        <rect x="6" y="9" width="20" height="15" rx="2" fill="#E8935A" stroke="#4A3728" stroke-width="1.2"/>
+        <circle cx="12" cy="16.5" r="2" fill="#FFF"/>
+        <circle cx="20" cy="16.5" r="2" fill="#FFF"/>
+        <path d="M11 21 Q16 25 21 21" stroke="#FFF" stroke-width="1.5" fill="none"/>
+        <polygon points="6,9 4,5 9,7" fill="#D9534F"/>
+        <polygon points="26,9 28,5 23,7" fill="#D9534F"/>
+      </svg>`;
+    case "property":
+      // 按地产组配色生成不同风格的小屋/建筑（同组共用配色，构图随id微调出朝向变化）
+      return `<svg viewBox="0 0 32 32"><rect width="32" height="32" fill="#FAF6F0"/>
+        <rect x="6" y="15" width="20" height="13" fill="${groupColor}"/>
+        <polygon points="16,5 28,15 4,15" fill="#8A5A3F"/>
+        <rect x="13" y="20" width="6" height="8" fill="#5A3A28"/>
+        <rect x="8" y="18" width="4" height="4" fill="#FFF6DC"/>
+        <rect x="20" y="18" width="4" height="4" fill="#FFF6DC"/>
+      </svg>`;
+    default:
+      return "";
+  }
+}
+
+// ---------- 格子emoji兜底图标（用于无SVG分支时的极简兼容，目前已被renderTileArt覆盖所有类型）----------
 const TILE_ICONS = {
   go: "🏁", jail: "🚓", freeparking: "🎪", gotojail: "🚨",
   tax: "💸", card: "🎴", station: "🚉", utility: "⚡",
@@ -545,6 +737,45 @@ function getPlayerAppearance(player) {
     shirt: SHIRT_COLORS[seed % SHIRT_COLORS.length],
     hairStyle: HAIR_STYLES[seed % HAIR_STYLES.length],
   };
+}
+
+// 职业配饰生成器：根据jobId返回叠加在头像上的SVG片段（帽子/眼镜/胡子等），覆盖在头发层之上
+function renderJobBadge(jobId) {
+  switch (jobId) {
+    case "architect": // 建筑师：黄色安全帽
+      return `<rect x="7" y="3" width="18" height="6" rx="3" fill="#E8C547" stroke="#9C7A1F" stroke-width="0.6"/>
+              <rect x="6" y="8" width="20" height="2" fill="#C9A24A"/>`;
+    case "banker": // 银行家：领带 + 圆框眼镜
+      return `<circle cx="13" cy="16" r="3" fill="none" stroke="#2A2018" stroke-width="1"/>
+              <circle cx="19" cy="16" r="3" fill="none" stroke="#2A2018" stroke-width="1"/>
+              <rect x="15.5" y="16" width="1" height="1" fill="#2A2018"/>
+              <polygon points="14,23 18,23 16,29" fill="#D9534F"/>`;
+    case "artist": // 艺术家：贝雷帽 + 围巾
+      return `<ellipse cx="16" cy="5" rx="9" ry="4" fill="#C9A0DC" stroke="#7A4A6B" stroke-width="0.6"/>
+              <circle cx="22" cy="3" r="1.5" fill="#7A4A6B"/>
+              <rect x="6" y="22" width="20" height="3" fill="#E8935A"/>`;
+    case "merchant": // 商人：礼帽 + 胡子
+      return `<rect x="9" y="0" width="14" height="6" fill="#3A2A1E"/>
+              <rect x="6" y="5" width="20" height="2.5" fill="#2A1E15"/>
+              <rect x="11" y="18.5" width="10" height="1.6" fill="#3A2A1E"/>`;
+    case "scholar": // 学者：学士帽 + 方框眼镜
+      return `<polygon points="6,4 26,4 16,9 6,4" fill="#1A1A1A"/>
+              <rect x="14" y="2" width="4" height="4" fill="#1A1A1A"/>
+              <circle cx="22" cy="1" r="1.2" fill="#D4AC4A"/>
+              <rect x="10.5" y="14" width="5" height="4" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+              <rect x="16.5" y="14" width="5" height="4" fill="none" stroke="#1A1A1A" stroke-width="1"/>`;
+    case "freelancer": // 自由职业者：棒球帽反戴 + 墨镜
+      return `<rect x="8" y="3" width="16" height="5" rx="2" fill="#6FB87F" stroke="#3D7A4A" stroke-width="0.6"/>
+              <rect x="22" y="4" width="4" height="3" fill="#3D7A4A"/>
+              <rect x="9" y="15" width="14" height="3" fill="#1A1A1A"/>`;
+    case "coder": // 码农：连帽衫帽子 + 黑框眼镜
+      return `<path d="M7 8 Q7 1 16 1 Q25 1 25 8 L22 8 Q22 4 16 4 Q10 4 10 8 Z" fill="#4A6FA5"/>
+              <rect x="10" y="14.5" width="5" height="4" fill="none" stroke="#1A1A1A" stroke-width="1.2"/>
+              <rect x="17" y="14.5" width="5" height="4" fill="none" stroke="#1A1A1A" stroke-width="1.2"/>
+              <rect x="15" y="16" width="2" height="1" fill="#1A1A1A"/>`;
+    default:
+      return "";
+  }
 }
 
 // 生成一个 32x32 像素风格小人头像的 SVG 字符串
@@ -573,6 +804,9 @@ function renderPixelAvatar(player, size = 28) {
       hairShape = "";
   }
 
+  // 职业配饰：在头发层之上叠加，覆盖头顶/眼睛/脖子区域，让每种职业一眼可辨
+  const jobBadge = renderJobBadge(player.jobId);
+
   return `
   <svg viewBox="0 0 32 32" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
     <rect x="9" y="9" width="14" height="14" fill="${skin}"/>
@@ -583,6 +817,7 @@ function renderPixelAvatar(player, size = 28) {
     <rect x="7" y="23" width="18" height="9" fill="${shirt}"/>
     <rect x="6" y="24" width="3" height="6" fill="${shirt}"/>
     <rect x="23" y="24" width="3" height="6" fill="${shirt}"/>
+    ${jobBadge}
   </svg>`;
 }
 
@@ -597,7 +832,81 @@ const App = {
   connected: false,
   reconnectTimer: null,
   reconnectAttempts: 0,
+  soundEnabled: true,
+  autoPilot: false,
+  lastSeenLogIndex: 0, // 用于检测新日志，触发对应音效
 };
+
+// ---------- 音效系统（Web Audio API 实时合成，无需任何外部音频文件）----------
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      return null;
+    }
+  }
+  return audioCtx;
+}
+
+// 播放一个简单的合成音：频率序列 + 波形 + 包络
+function playTone(freqs, { duration = 0.12, type = "square", gain = 0.08, gap = 0.04 } = {}) {
+  if (!App.soundEnabled) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+  let t = ctx.currentTime;
+  freqs.forEach((freq) => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
+    t += duration + gap;
+  });
+}
+
+const SFX = {
+  diceRoll: () => playTone([200, 260, 220, 300], { duration: 0.06, type: "square", gain: 0.05, gap: 0.01 }),
+  diceSettle: () => playTone([440, 660], { duration: 0.1, type: "triangle", gain: 0.1, gap: 0.02 }),
+  buy: () => playTone([523, 659, 784], { duration: 0.09, type: "sine", gain: 0.09, gap: 0.02 }),
+  payRent: () => playTone([300, 240], { duration: 0.12, type: "sawtooth", gain: 0.07, gap: 0.01 }),
+  bankrupt: () => playTone([400, 300, 200, 100], { duration: 0.18, type: "sawtooth", gain: 0.09, gap: 0.02 }),
+  win: () => playTone([523, 659, 784, 1046], { duration: 0.16, type: "triangle", gain: 0.12, gap: 0.03 }),
+  jackpot: () => playTone([659, 784, 988, 1318, 988, 1318], { duration: 0.1, type: "triangle", gain: 0.11, gap: 0.01 }),
+  notify: () => playTone([700, 900], { duration: 0.07, type: "sine", gain: 0.06, gap: 0.01 }),
+  error: () => playTone([220, 160], { duration: 0.1, type: "square", gain: 0.06, gap: 0.01 }),
+  chat: () => playTone([880], { duration: 0.06, type: "sine", gain: 0.05, gap: 0 }),
+};
+
+// 根据日志文本内容推断该播放哪个音效（轻量启发式，不需要服务器额外传事件类型）
+function inferSfxFromLogText(text) {
+  if (text.includes("破产")) return SFX.bankrupt;
+  if (text.includes("获胜")) return SFX.win;
+  if (text.includes("开标") || text.includes("中奖") || text.includes("开奖") && text.includes("🎉")) return SFX.jackpot;
+  if (text.includes("购买了")) return SFX.buy;
+  if (text.includes("支付租金") || text.includes("缴纳")) return SFX.payRent;
+  return null;
+}
+
+// 扫描新增日志，播放对应音效（在每次state更新后调用）
+function playSfxForNewLogs(state) {
+  if (!state || !state.log) return;
+  const newLogs = state.log.slice(App.lastSeenLogIndex);
+  newLogs.forEach((l) => {
+    const sfx = inferSfxFromLogText(l.text);
+    if (sfx) sfx();
+  });
+  App.lastSeenLogIndex = state.log.length;
+}
 
 // ---------- 工具函数 ----------
 function $(sel) { return document.querySelector(sel); }
@@ -622,6 +931,59 @@ function showToast(msg, duration = 2400) {
   t.classList.add("show");
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove("show"), duration);
+}
+
+function showDiceAnnounce(announce) {
+  const overlay = $("#dice-announce-overlay");
+  if (!overlay || !announce) return;
+  const [d1, d2] = announce.dice;
+  const toTile = announce.toPos != null ? BOARD[announce.toPos] : null;
+
+  overlay.innerHTML = "";
+  overlay.appendChild(el("div", {}, `${announce.playerName} 掷出了`));
+  overlay.appendChild(el("div", { class: "announce-dice" }, `🎲 ${d1} + ${d2} = ${d1 + d2}`));
+  if (toTile) {
+    overlay.appendChild(el("div", { style: "font-size:13px; font-weight:400; margin-top:4px; opacity:0.85;" }, `来到了 ${toTile.name}`));
+  }
+
+  overlay.classList.add("show");
+  clearTimeout(overlay._timer);
+  overlay._timer = setTimeout(() => overlay.classList.remove("show"), 2000);
+}
+
+// ---------- 自动托管：开启后，轮到自己时按简单策略自动操作，用于暂时离开不耽误其他人 ----------
+function maybeAutoPilot(state) {
+  if (!App.autoPilot) return;
+  if (!state || state.phase !== "playing") return;
+  const cp = state.players[state.currentPlayerIndex];
+  if (!cp || cp.id !== App.playerId) return;
+  const me = cp;
+  if (me.bankrupt) return;
+
+  // 稍微延迟一下再操作，模拟"思考"，也给UI一点时间渲染当前状态，避免操作过快显得突兀
+  setTimeout(() => {
+    if (!App.autoPilot) return; // 延迟期间可能被取消
+    const s = App.gameState;
+    if (!s || s.phase !== "playing") return;
+    const curr = s.players[s.currentPlayerIndex];
+    if (!curr || curr.id !== App.playerId) return;
+
+    const phase = s.turnSubPhase;
+    if (phase === "rolling") {
+      sendAction("rollDice");
+    } else if (phase === "awaitingBuy") {
+      // 策略：现金大于400才买，避免托管期间因买地花光现金
+      sendAction("buyProperty", { buy: curr.cash > 400 });
+    } else if (phase === "awaitingBank") {
+      sendAction("bankLeave"); // 托管默认不主动理财，避免误操作产生贷款
+    } else if (phase === "awaitingLottery") {
+      sendAction("lotterySkip");
+    } else if (phase === "awaitingGamble") {
+      sendAction("gambleChoice", { wantsGamble: false }); // 托管默认稳妥交租，不赌
+    } else if (phase === "awaitingBagBid") {
+      sendAction("bagBidSkip");
+    }
+  }, 600);
 }
 
 function getOrCreatePlayerId() {
@@ -667,19 +1029,35 @@ function connectToRoom(roomId, playerName) {
     if (msg.type === "welcome") {
       App.playerId = msg.playerId;
       App.gameState = msg.state;
+      App.lastSeenLogIndex = msg.state.log ? msg.state.log.length : 0; // 初始连接不补放历史音效
       saveSession(roomId, playerName);
       App.screen = "room";
       render();
     } else if (msg.type === "state") {
       const prevPhase = App.gameState?.phase;
+      const prevChatLen = App.gameState?.chat?.length || 0;
+      const prevDiceAnnounce = App.gameState?.lastDiceAnnounce;
       App.gameState = msg.state;
+
+      playSfxForNewLogs(msg.state);
+      if ((msg.state.chat?.length || 0) > prevChatLen) {
+        SFX.chat();
+      }
+      // 检测新的骰子播报，触发大字浮层
+      if (msg.state.lastDiceAnnounce && msg.state.lastDiceAnnounce !== prevDiceAnnounce) {
+        showDiceAnnounce(msg.state.lastDiceAnnounce);
+      }
+
       if (App.screen !== "room") { App.screen = "room"; }
       render();
       if (prevPhase === "waiting" && msg.state.phase === "playing") {
         showToast("游戏开始！");
       }
+      // 自动托管：轮到自己且开启了托管时，按简单策略自动操作
+      maybeAutoPilot(msg.state);
     } else if (msg.type === "error") {
       showToast(msg.message);
+      SFX.error();
     }
   });
 
@@ -885,17 +1263,18 @@ function renderBoard(state) {
       style: `grid-column:${col + 1}; grid-row:${row + 1};`,
     });
 
-    // 所有权整块染色背景（半透明叠层，一眼看出"这块是谁的"）
+    // 填满格子的像素插画层（每种地块类型独立设计构图）
+    const artLayer = el("div", { class: "tile-art" });
+    artLayer.innerHTML = renderTileArt(tile);
+    cell.appendChild(artLayer);
+
+    // 所有权整块染色背景（半透明叠层，在插画之上、文字之下，一眼看出"这块是谁的"）
     if (owner) {
       cell.appendChild(el("div", { class: `tile-owned-bg pc-${owner.colorIndex % 6}` }));
     }
 
-    if (tile.group) {
+    if (tile.group && !isCorner) {
       cell.appendChild(el("div", { class: "tile-colorbar", style: `background:var(${GROUP_COLOR_VAR[tile.group]})` }));
-    }
-
-    if (TILE_ICONS[tile.type]) {
-      cell.appendChild(el("div", { class: "tile-icon" }, TILE_ICONS[tile.type]));
     }
 
     cell.appendChild(el("div", { class: "tile-name" }, tile.name));
@@ -930,13 +1309,55 @@ function renderBoard(state) {
   wrapper.appendChild(center);
 
   // 棋子层：独立绝对定位，叠加在 board-area 上（不在 board-grid 内部），用于平滑滑动动画
-  const boardArea = el("div", { class: "board-area" }, [wrapper]);
+  const boardArea = el("div", { class: "board-area", id: "board-area-inner" }, [wrapper]);
   const tokenLayer = el("div", { class: "token-layer", id: "token-layer" });
   boardArea.appendChild(tokenLayer);
 
   renderTokens(state, tokenLayer);
 
-  return boardArea;
+  // 镜头视窗：固定大小+裁切溢出，内部 board-area 用 transform 实现缩放平移跟随
+  const viewport = el("div", { class: "board-viewport" }, [boardArea]);
+
+  const resetBtn = el("button", { class: "camera-reset-btn" }, "🗺️ 回到全局视图");
+  resetBtn.addEventListener("click", () => {
+    Camera.locked = false;
+    applyCameraTransform();
+  });
+  viewport.appendChild(resetBtn);
+
+  // 应用当前镜头状态（首次渲染时立即对齐，避免出现一帧默认视角再跳转的闪烁）
+  setTimeout(() => applyCameraTransform(), 0);
+
+  return viewport;
+}
+
+// ---------- 镜头跟随系统 ----------
+const Camera = {
+  locked: true, // true: 自动跟随当前回合玩家；false: 用户手动切到全局视图
+};
+
+function applyCameraTransform() {
+  const boardAreaInner = document.getElementById("board-area-inner");
+  if (!boardAreaInner || !App.gameState) return;
+  const state = App.gameState;
+
+  if (!Camera.locked || state.phase !== "playing") {
+    boardAreaInner.style.transform = "scale(1) translate(0, 0)";
+    return;
+  }
+
+  const cp = state.players[state.currentPlayerIndex];
+  if (!cp) {
+    boardAreaInner.style.transform = "scale(1) translate(0, 0)";
+    return;
+  }
+
+  const { leftPct, topPct } = getTileCenterPercent(cp.position);
+  const scale = 1.8;
+  // 把目标格子的中心点平移到视窗中心：偏移量 = (50% - 目标点百分比) 按缩放比例放大
+  const translateX = (50 - leftPct) * (scale / 100) * 100;
+  const translateY = (50 - topPct) * (scale / 100) * 100;
+  boardAreaInner.style.transform = `scale(${scale}) translate(${translateX}%, ${translateY}%)`;
 }
 
 function makeDieEl(value) {
@@ -1043,10 +1464,7 @@ function renderGamePlaying(container) {
 
   wrap.appendChild(buildTurnBanner(state));
   wrap.appendChild(buildActionPanel(state));
-  wrap.appendChild(el("div", { class: "card", style: "margin-top:10px;" }, [
-    el("div", { style: "font-weight:800; margin-bottom:6px; font-size:13px;" }, "动态"),
-    buildLogBox(state),
-  ]));
+  wrap.appendChild(buildLogChatPanel(state));
 
   container.appendChild(wrap);
 }
@@ -1094,7 +1512,8 @@ function buildActionPanel(state) {
   }
 
   if (me.inJail && state.turnSubPhase === "rolling") {
-    panel.appendChild(el("div", { class: "card", style: "margin-bottom:10px; text-align:center;" }, `你在监狱中（第 ${me.jailTurns + 1}/3 轮）`));
+    const maxJailTurns = me.jobId === "scholar" ? 2 : 3;
+    panel.appendChild(el("div", { class: "card", style: "margin-bottom:10px; text-align:center;" }, `你在监狱中（第 ${me.jailTurns + 1}/${maxJailTurns} 轮）`));
     const row = el("div", { class: "row" });
     row.appendChild(el("button", { class: "btn btn-primary", style: "flex:1;", onclick: () => rollDiceWithAnimation() }, "掷骰子越狱"));
     if (me.cash >= 50) {
@@ -1105,10 +1524,19 @@ function buildActionPanel(state) {
     }
     panel.appendChild(row);
   } else if (me.inHospital && state.turnSubPhase === "rolling") {
-    panel.appendChild(el("div", { class: "card", style: "text-align:center;" }, `🏥 住院中（第 ${me.hospitalTurns + 1}/2 轮），无法行动`));
-    panel.appendChild(el("button", { class: "btn btn-block", style: "margin-top:8px;", onclick: () => sendAction("rollDice") }, "确认（跳过本回合）"));
+    const reasonText = me.hospitalReason === "overwork" ? "💻 过劳住院" : me.hospitalReason === "chain" ? "⛓️ 连锁反应住院" : "🏥 住院中";
+    panel.appendChild(el("div", { class: "card", style: "text-align:center;" }, `${reasonText}（第 ${me.hospitalTurns + 1}/2 轮），无法行动`));
+    const row = el("div", { class: "row", style: "margin-top:8px;" });
+    row.appendChild(el("button", { class: "btn btn-block", style: "flex:1;", onclick: () => sendAction("rollDice") }, "继续住院（跳过）"));
+    if (me.cash >= 150) {
+      row.appendChild(el("button", { class: "btn btn-primary", style: "flex:1;", onclick: () => sendAction("payMedicalFee") }, "付$150提前出院"));
+    }
+    panel.appendChild(row);
   } else if (state.turnSubPhase === "rolling") {
     panel.appendChild(el("button", { class: "btn btn-primary btn-block", onclick: () => rollDiceWithAnimation() }, "🎲 掷骰子"));
+    if (me.jobId === "coder" && (me.rerollsLeft || 0) > 0) {
+      panel.appendChild(el("button", { class: "btn btn-block", style: "margin-top:8px; font-size:13px;", onclick: () => { rollDiceWithAnimation(); } }, `🔁 调试：重新掷骰子（剩${me.rerollsLeft}次）`));
+    }
   } else if (state.turnSubPhase === "awaitingBuy" && state.pendingDecision) {
     const tile = BOARD[state.pendingDecision.tileId];
     panel.appendChild(el("div", { class: "card", style: "margin-bottom:10px; text-align:center;" }, `购买【${tile.name}】？ $${tile.price}`));
@@ -1120,6 +1548,10 @@ function buildActionPanel(state) {
     panel.appendChild(buildBankPanel(me));
   } else if (state.turnSubPhase === "awaitingLottery" && state.pendingDecision) {
     panel.appendChild(buildLotteryPanel(me));
+  } else if (state.turnSubPhase === "awaitingGamble" && state.pendingDecision) {
+    panel.appendChild(buildGamblePanel(state, me));
+  } else if (state.turnSubPhase === "awaitingBagBid" && state.pendingDecision) {
+    panel.appendChild(buildBagBidPanel(state, me));
   }
 
   const buildableTiles = BOARD.filter((t) => t.type === "property" && state.properties[t.id]?.ownerId === App.playerId);
@@ -1128,6 +1560,54 @@ function buildActionPanel(state) {
   }
 
   return panel;
+}
+
+// ---------- 对赌面板：停在别人地产时，选择乖乖交租或猜骰子单双 ----------
+function buildGamblePanel(state, me) {
+  const dec = state.pendingDecision;
+  const tile = BOARD[dec.tileId];
+  const pState = state.properties[dec.tileId];
+  const rent = dec.rentAmount; // 服务器算好的精确租金，前端直接使用，不重新估算
+  const owner = state.players.find((p) => p.id === pState.ownerId);
+
+  const wrap = el("div", { class: "card" });
+  wrap.appendChild(el("div", { style: "font-weight:800; margin-bottom:8px;" }, `落地【${tile.name}】，归 ${owner ? owner.name : "对方"} 所有`));
+  wrap.appendChild(el("div", { style: "font-size:13px; color:var(--ink-soft); margin-bottom:10px;" }, `应付租金 $${rent}，可以选择乖乖交租，或猜骰子单/双赌一把（猜中免租，猜错双倍租金 $${rent * 2}）`));
+
+  wrap.appendChild(el("button", { class: "btn btn-block", style: "margin-bottom:8px;", onclick: () => sendAction("gambleChoice", { wantsGamble: false }) }, `乖乖交租 $${rent}`));
+
+  const row = el("div", { class: "row" });
+  row.appendChild(el("button", { class: "btn btn-success", style: "flex:1;", onclick: () => sendAction("gambleChoice", { wantsGamble: true, guessOdd: true }) }, "🎲 赌一把：猜单"));
+  row.appendChild(el("button", { class: "btn btn-success", style: "flex:1;", onclick: () => sendAction("gambleChoice", { wantsGamble: true, guessOdd: false }) }, "🎲 赌一把：猜双"));
+  wrap.appendChild(row);
+
+  return wrap;
+}
+
+// ---------- 福袋出价面板 ----------
+function buildBagBidPanel(state, me) {
+  const wrap = el("div", { class: "card" });
+  wrap.appendChild(el("div", { style: "font-weight:800; margin-bottom:8px;" }, "🎁 自由集市福袋竞标"));
+  wrap.appendChild(el("div", { style: "font-size:13px; color:var(--ink-soft); margin-bottom:10px;" },
+    `共 ${state.activeBags.bags.length} 个福袋，金额保密，暗标只能出价一次，第 ${state.activeBags.revealRound} 大轮开标`
+  ));
+
+  state.activeBags.bags.forEach((bag) => {
+    const row = el("div", { style: "margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--panel-border);" });
+    row.appendChild(el("div", { style: "font-weight:700; margin-bottom:6px;" }, `福袋 ${bag.label}`));
+    const inputRow = el("div", { class: "row" });
+    const input = el("input", { class: "input", type: "number", placeholder: "暗标金额", style: "flex:1;" });
+    inputRow.appendChild(input);
+    inputRow.appendChild(el("button", { class: "btn btn-primary", style: "white-space:nowrap;", onclick: () => {
+      const amt = parseInt(input.value, 10);
+      if (amt > 0) sendAction("bagBid", { bagId: bag.id, amount: amt });
+    }}, "出价"));
+    row.appendChild(inputRow);
+    wrap.appendChild(row);
+  });
+
+  wrap.appendChild(el("button", { class: "btn btn-block", onclick: () => sendAction("bagBidSkip") }, "不参与，离开"));
+  return wrap;
 }
 
 // ---------- 银行操作面板 ----------
@@ -1193,45 +1673,130 @@ function buildLotteryPanel(me) {
 function buildLogBox(state) {
   const logBox = el("div", { class: "log-box" });
   state.log.slice(-12).reverse().forEach((l) => {
-    logBox.appendChild(el("div", { class: "log-line" }, l.text));
+    const timeStr = formatTimeHHMMSS(l.ts);
+    logBox.appendChild(el("div", { class: "log-line" }, [
+      el("span", { style: "color:var(--ink-soft); font-size:10px; margin-right:6px;" }, timeStr),
+      l.text,
+    ]));
   });
   return logBox;
 }
 
+function formatTimeHHMMSS(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+// ---------- 动态/聊天 双标签面板 ----------
+let activeLogTab = "log"; // 'log' | 'chat'，模块级状态，跨render保留当前选中的标签
+
+function buildLogChatPanel(state) {
+  const wrap = el("div", { class: "card log-chat-panel", style: "margin-top:10px;" });
+
+  const tabRow = el("div", { class: "row", style: "margin-bottom:8px; gap:6px;" });
+  tabRow.appendChild(el("button", {
+    class: "btn" + (activeLogTab === "log" ? " btn-primary" : ""),
+    style: "flex:1; padding:8px; font-size:12px;",
+    onclick: () => { activeLogTab = "log"; render(); },
+  }, "📜 动态"));
+  const unreadDot = state.chat && state.chat.length > 0 ? " 💬" : "";
+  tabRow.appendChild(el("button", {
+    class: "btn" + (activeLogTab === "chat" ? " btn-primary" : ""),
+    style: "flex:1; padding:8px; font-size:12px;",
+    onclick: () => { activeLogTab = "chat"; render(); },
+  }, "聊天" + unreadDot));
+  wrap.appendChild(tabRow);
+
+  if (activeLogTab === "log") {
+    wrap.appendChild(buildLogBox(state));
+  } else {
+    wrap.appendChild(buildChatPanel(state));
+  }
+
+  return wrap;
+}
+
+function buildChatPanel(state) {
+  const chatWrap = el("div", {});
+  const chatBox = el("div", { class: "log-box", id: "chat-box", style: "max-height:150px;" });
+  (state.chat || []).slice(-30).forEach((c) => {
+    const isMine = c.playerId === App.playerId;
+    chatBox.appendChild(el("div", {
+      class: "log-line",
+      style: isMine ? "color:var(--accent-deep); font-weight:600;" : "",
+    }, [
+      el("span", { style: "color:var(--ink-soft); font-size:10px; margin-right:6px;" }, formatTimeHHMMSS(c.ts)),
+      el("b", {}, c.name + "："),
+      c.text,
+    ]));
+  });
+  if (!state.chat || state.chat.length === 0) {
+    chatBox.appendChild(el("div", { style: "color:var(--ink-soft); text-align:center; padding:10px 0;" }, "还没有人说话，打个招呼吧"));
+  }
+  chatWrap.appendChild(chatBox);
+
+  const inputRow = el("div", { class: "row", style: "margin-top:8px;" });
+  const input = el("input", { class: "input", placeholder: "说点什么…", maxlength: "200", style: "flex:1;" });
+  const sendBtn = el("button", { class: "btn btn-primary", style: "white-space:nowrap;" }, "发送");
+  const doSend = () => {
+    const text = input.value.trim();
+    if (!text) return;
+    sendAction("sendChat", { text });
+    input.value = "";
+  };
+  sendBtn.addEventListener("click", doSend);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") doSend(); });
+  inputRow.appendChild(input);
+  inputRow.appendChild(sendBtn);
+  chatWrap.appendChild(inputRow);
+
+  // 自动滚动到底部，方便看到最新消息
+  setTimeout(() => { chatBox.scrollTop = chatBox.scrollHeight; }, 0);
+
+  return chatWrap;
+}
+
 // ---------- 建房弹窗 ----------
 function openBuildModal(state) {
-  const myGroups = {};
-  BOARD.forEach((t) => {
-    if (t.type === "property" && state.properties[t.id]?.ownerId === App.playerId) {
-      myGroups[t.group] = myGroups[t.group] || [];
-      myGroups[t.group].push(t);
-    }
-  });
+  const me = state.players.find((p) => p.id === App.playerId);
+  const isArchitect = me && me.jobId === "architect";
+  const myTiles = BOARD.filter((t) => t.type === "property" && state.properties[t.id]?.ownerId === App.playerId);
 
   const overlay = el("div", { class: "modal-overlay", onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
   const modal = el("div", { class: "modal-box card" });
-  modal.appendChild(el("div", { style: "font-weight:800; margin-bottom:12px;" }, "建房"));
+  modal.appendChild(el("div", { style: "font-weight:800; margin-bottom:4px;" }, "建房"));
+  modal.appendChild(el("div", { style: "font-size:12px; color:var(--ink-soft); margin-bottom:12px;" }, "拥有地产即可建房，无需集齐整组；建房后需保留至少 $500 现金"));
 
-  Object.entries(myGroups).forEach(([group, tiles]) => {
-    const fullGroup = tiles.length === BOARD.filter((t) => t.group === group).length;
-    tiles.forEach((tile) => {
-      const pState = state.properties[tile.id];
-      const row = el("div", { class: "row-between", style: "padding:8px 0; border-bottom:2px solid var(--panel-border);" }, [
-        el("div", {}, [
-          el("div", { style: "font-weight:700;" }, tile.name),
-          el("div", { style: "font-size:12px; color:var(--ink-soft);" }, `房屋: ${pState.houses}/5  造价: $${tile.houseCost || 50}`),
-        ]),
-        el("button", {
-          class: "btn btn-primary",
-          style: "padding:8px 14px; font-size:13px;",
-          onclick: () => { sendAction("buildHouse", { tileId: tile.id }); overlay.remove(); },
-        }, "+建造"),
-      ]);
-      if (!fullGroup || pState.houses >= 5) {
-        row.querySelector("button").disabled = true;
-      }
-      modal.appendChild(row);
-    });
+  if (myTiles.length === 0) {
+    modal.appendChild(el("div", { style: "text-align:center; color:var(--ink-soft); padding:20px 0;" }, "你还没有可建房的地产"));
+  }
+
+  myTiles.forEach((tile) => {
+    const pState = state.properties[tile.id];
+    const baseCost = tile.houseCost || 50;
+    const cost = isArchitect ? Math.floor(baseCost * 0.8) : baseCost;
+    const costLabel = isArchitect ? `$${cost}（建筑师折扣，原价$${baseCost}）` : `$${cost}`;
+    const canAfford = me.cash - cost >= 500;
+    const isFull = pState.houses >= 5;
+
+    const row = el("div", { class: "row-between", style: "padding:8px 0; border-bottom:2px solid var(--panel-border);" }, [
+      el("div", {}, [
+        el("div", { style: "font-weight:700;" }, tile.name),
+        el("div", { style: "font-size:12px; color:var(--ink-soft);" }, `房屋: ${pState.houses}/5  造价: ${costLabel}`),
+        !canAfford && !isFull ? el("div", { style: "font-size:11px; color:var(--danger);" }, "现金不足安全垫，无法建造") : null,
+      ]),
+      el("button", {
+        class: "btn btn-primary",
+        style: "padding:8px 14px; font-size:13px;",
+        onclick: () => { sendAction("buildHouse", { tileId: tile.id }); overlay.remove(); },
+      }, "+建造"),
+    ]);
+    if (isFull || !canAfford) {
+      row.querySelector("button").disabled = true;
+    }
+    modal.appendChild(row);
   });
 
   modal.appendChild(el("button", { class: "btn btn-block", style: "margin-top:14px;", onclick: () => overlay.remove() }, "关闭"));
@@ -1243,22 +1808,37 @@ function openBuildModal(state) {
 function renderGameEnded(container) {
   const state = App.gameState;
   const winner = state.players.find((p) => p.id === state.winnerId);
-  const screen = el("div", { class: "screen screen-center" });
 
-  screen.appendChild(el("div", { class: "pixel-font", style: "font-size:24px; margin-bottom:12px;" }, "🏆 游戏结束"));
-  screen.appendChild(el("div", { style: "font-size:18px; font-weight:800; color:var(--accent-deep); margin-bottom:24px;" },
+  const wrap = el("div", { class: "game-wrap" });
+  wrap.appendChild(buildPlayerStrip(state));
+
+  const boardArea = renderBoard(state);
+  boardArea.id = "board-area-root";
+  wrap.appendChild(boardArea);
+
+  // 半透明结算卡片，叠加显示在棋盘下方（不遮挡棋盘，玩家可以滚动查看棋盘上每个人的地产分布，
+  // 理解谁的地产多、谁是怎么破产的，而不是直接跳走看不到这些信息）
+  const resultCard = el("div", { class: "card", style: "margin-top:10px; border-color:var(--accent);" });
+  resultCard.appendChild(el("div", { class: "pixel-font", style: "font-size:18px; margin-bottom:8px; text-align:center; color:var(--accent-deep);" }, "🏆 游戏结束"));
+  resultCard.appendChild(el("div", { style: "font-size:15px; font-weight:800; text-align:center; margin-bottom:14px;" },
     winner ? `${winner.name} 获胜！` : "游戏结束"
   ));
 
   const ranking = [...state.players].sort((a, b) => b.cash - a.cash);
-  screen.appendChild(el("div", { class: "card", style: "width:100%; max-width:320px; margin-bottom:24px;" },
-    ranking.map((p, i) => el("div", { class: "row-between", style: "padding:6px 0;" }, [
-      el("span", {}, `${i + 1}. ${p.name}`),
-      el("span", {}, p.bankrupt ? "破产" : `$${p.cash}`),
-    ]))
+  resultCard.appendChild(el("div", { style: "margin-bottom:14px;" },
+    ranking.map((p, i) => {
+      const ownedCount = Object.values(state.properties).filter((ps) => ps.ownerId === p.id).length;
+      const avatarWrap = el("span", { style: "display:inline-flex; width:22px; height:22px; border-radius:50%; overflow:hidden; border:2px solid var(--ink); flex-shrink:0; margin-right:6px; vertical-align:middle;" });
+      avatarWrap.innerHTML = renderPixelAvatar(p, 22);
+      return el("div", { class: "row-between", style: "padding:6px 0; border-bottom:1px dashed var(--panel-border);" }, [
+        el("span", { class: "row", style: "gap:4px;" }, [avatarWrap, `${i + 1}. ${p.name}`]),
+        el("span", { style: "font-size:12px; color:var(--ink-soft);" }, `${ownedCount}块地产`),
+        el("span", { style: "font-weight:700;" }, p.bankrupt ? "💥 破产" : `$${p.cash}`),
+      ]);
+    })
   ));
 
-  screen.appendChild(el("button", { class: "btn btn-primary btn-block", style: "max-width:320px;", onclick: () => {
+  resultCard.appendChild(el("button", { class: "btn btn-primary btn-block", onclick: () => {
     clearSession();
     App.roomId = null;
     if (App.ws) App.ws.close();
@@ -1266,7 +1846,10 @@ function renderGameEnded(container) {
     render();
   }}, "返回首页"));
 
-  container.appendChild(screen);
+  wrap.appendChild(resultCard);
+  wrap.appendChild(buildLogChatPanel(state));
+
+  container.appendChild(wrap);
 }
 
 // ---------- 主渲染调度 ----------
@@ -1285,20 +1868,47 @@ function render() {
   app.innerHTML = "";
 
   if (App.screen === "room" && App.gameState) {
+    const autoPilotBtn = App.gameState.phase === "playing" ? el("button", {
+      class: "btn" + (App.autoPilot ? " btn-primary" : ""),
+      style: "padding:6px 9px; font-size:11px;",
+    }, App.autoPilot ? "🤖 托管中" : "🤖 托管") : null;
+    if (autoPilotBtn) {
+      autoPilotBtn.addEventListener("click", () => {
+        App.autoPilot = !App.autoPilot;
+        autoPilotBtn.classList.toggle("btn-primary", App.autoPilot);
+        autoPilotBtn.textContent = App.autoPilot ? "🤖 托管中" : "🤖 托管";
+        showToast(App.autoPilot ? "已开启自动托管" : "已关闭自动托管");
+        if (App.autoPilot) maybeAutoPilot(App.gameState); // 开启时立刻检查一次，避免错过当前回合
+      });
+    }
+
+    const soundBtn = el("button", {
+      class: "btn",
+      style: "padding:6px 9px; font-size:11px;",
+    }, App.soundEnabled ? "🔊" : "🔇");
+    soundBtn.addEventListener("click", () => {
+      App.soundEnabled = !App.soundEnabled;
+      soundBtn.textContent = App.soundEnabled ? "🔊" : "🔇";
+    });
+
     const top = el("div", { class: "topbar" }, [
       el("div", { class: "topbar-title" }, [
         el("span", { class: "conn-dot" + (App.connected ? "" : " offline") }),
         `房间 ${App.roomId}`,
       ]),
-      el("button", { class: "btn", style: "padding:6px 10px; font-size:12px;", onclick: () => {
-        if (confirm("确定退出房间吗？退出后可凭房间号重新加入。")) {
-          clearSession();
-          App.roomId = null;
-          if (App.ws) App.ws.close();
-          App.screen = "home";
-          render();
-        }
-      }}, "退出"),
+      el("div", { class: "row", style: "gap:6px;" }, [
+        autoPilotBtn,
+        soundBtn,
+        el("button", { class: "btn", style: "padding:6px 10px; font-size:12px;", onclick: () => {
+          if (confirm("确定退出房间吗？退出后可凭房间号重新加入。")) {
+            clearSession();
+            App.roomId = null;
+            if (App.ws) App.ws.close();
+            App.screen = "home";
+            render();
+          }
+        }}, "退出"),
+      ]),
     ]);
     app.appendChild(top);
 
@@ -1358,11 +1968,27 @@ function updateGamePlayingIncremental() {
     actionPanelOld.replaceWith(newPanel);
   }
 
-  const logBoxOld = document.querySelector(".log-box");
-  if (logBoxOld) {
-    const newLog = buildLogBox(state);
-    logBoxOld.replaceWith(newLog);
+  const logChatOld = document.querySelector(".log-chat-panel");
+  if (logChatOld) {
+    // 保留聊天输入框当前内容和焦点，避免别人操作触发的广播打断正在打字的玩家
+    const oldInput = logChatOld.querySelector("input.input");
+    const hadFocus = oldInput && document.activeElement === oldInput;
+    const oldValue = oldInput ? oldInput.value : "";
+
+    const newPanel = buildLogChatPanel(state);
+    logChatOld.replaceWith(newPanel);
+
+    if (oldValue) {
+      const newInput = newPanel.querySelector("input.input");
+      if (newInput) {
+        newInput.value = oldValue;
+        if (hadFocus) newInput.focus();
+      }
+    }
   }
+
+  // 5. 镜头跟随：棋盘格子内容刚被替换（第1步），此时再应用一次镜头变换，确保位置更新后镜头跟着对齐
+  applyCameraTransform();
 }
 
 // 增量移动棋子：已存在的token元素只更新left/top（触发CSS transition滑动），不存在则新建
