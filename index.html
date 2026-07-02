@@ -64,7 +64,10 @@
     box-shadow: 0 0 0 1px var(--panel-border);
   }
 
-  /* 桌面端（屏幕较宽时）给背景加一点呼吸感，不让内容贴边贴到浏览器边框 */
+  /* 桌面端（屏幕较宽时）给背景加一点呼吸感，不让内容贴边贴到浏览器边框；
+     同时把可用宽度大幅提升（720px -> 1100px），避免之前"窗口很宽但内容区域死板限宽760px导致
+     大片空白、动态/聊天框看起来没有铺满"的问题。1100px 这个上限本身仍然是为了避免在
+     27寸等超宽屏上棋盘格子被拉伸得过于巨大、比例失衡。 */
   @media (min-width: 760px) {
     body {
       display: flex;
@@ -72,7 +75,7 @@
       background: linear-gradient(135deg, #F0E8DC, #FAF6F0);
     }
     #app {
-      max-width: 760px;
+      max-width: 1100px;
       height: 100vh;
       box-shadow: 0 0 40px rgba(74, 55, 40, 0.15);
     }
@@ -278,6 +281,26 @@
   }
   .player-chip-bankrupt { opacity: 0.35; filter: grayscale(1); }
   .player-chip-info { display: flex; flex-direction: column; line-height: 1.2; }
+  .player-chip-job {
+    font-size: 10px;
+    color: var(--accent-deep);
+    margin-top: 1px;
+    cursor: pointer;
+    text-decoration: underline dotted;
+    width: fit-content;
+  }
+  .player-chip-job:active { opacity: 0.6; }
+
+  .job-tooltip {
+    position: fixed;
+    background: var(--ink);
+    color: white;
+    padding: 8px 12px;
+    border-radius: var(--radius-s);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    z-index: 600;
+    max-width: 220px;
+  }
   .player-chip-name { font-size: 11px; font-weight: 700; }
   .player-chip-cash { font-size: 16px; font-weight: 800; color: var(--accent-deep); }
   .player-chip-cash.cash-low-warning {
@@ -346,6 +369,11 @@
     position: absolute;
     transition: left 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
     transform: translate(-50%, -50%);
+    /* 棋子尺寸用容器宽度的百分比(cqw)而非固定px：棋盘越大，棋子也跟着等比例变大，
+       在桌面宽屏上会明显比格子本身更突出醒目；min/max做兜底避免极端尺寸下棋子过小或过大 */
+    width: clamp(26px, 9.5cqw, 56px);
+    height: clamp(30px, 10.8cqw, 64px);
+    z-index: 15; /* 确保棋子显示在格子插画、染色层之上，不会被遮挡 */
   }
   .token-bounce {
     animation: token-land 0.35s ease-out;
@@ -470,6 +498,7 @@
     border: 3px solid var(--ink);
     border-radius: var(--radius-s);
     background: white;
+    color: var(--ink); /* 显式设置深色文字，避免被外层浮层的白色文字(color:white)继承覆盖导致白底白字看不见 */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -890,6 +919,17 @@ function renderTileArt(tile) {
 }
 
 // ---------- 格子emoji兜底图标（用于无SVG分支时的极简兼容，目前已被renderTileArt覆盖所有类型）----------
+// ---------- 职业数据字典（与后端 game-engine.js 的 JOBS 完全一致，仅用于前端展示，不参与判定）----------
+const JOBS = {
+  architect: { id: "architect", name: "建筑师", icon: "🏗️", desc: "建房成本-20%" },
+  banker: { id: "banker", name: "银行家", icon: "💼", desc: "存款利率8%/贷款利率5%" },
+  artist: { id: "artist", name: "艺术家", icon: "🎨", desc: "抽卡正面效果概率更高" },
+  merchant: { id: "merchant", name: "商人", icon: "🕵️", desc: "工资较高，但经过起点先扣10%税" },
+  scholar: { id: "scholar", name: "学者", icon: "🎓", desc: "自带1张免费出狱卡，监狱关押轮数-1" },
+  freelancer: { id: "freelancer", name: "自由职业者", icon: "🍀", desc: "经过起点工资随机$50~250，不稳定但有额外奖励概率" },
+  coder: { id: "coder", name: "码农", icon: "🧑‍💻", desc: "工资全场最高(不打折)，但经过起点有25%概率过劳住院；可重新掷骰子2次" },
+};
+
 const TILE_ICONS = {
   go: "🏁", jail: "🚓", freeparking: "🎪", gotojail: "🚨",
   tax: "💸", card: "🎴", station: "🚉", utility: "⚡",
@@ -1129,7 +1169,36 @@ const SFX = {
   notify: () => playTone([700, 900], { duration: 0.07, type: "sine", gain: 0.06, gap: 0.01 }),
   error: () => playTone([220, 160], { duration: 0.1, type: "square", gain: 0.06, gap: 0.01 }),
   chat: () => playTone([880], { duration: 0.06, type: "sine", gain: 0.05, gap: 0 }),
+  jail: () => playTone([180, 140, 100], { duration: 0.14, type: "sawtooth", gain: 0.09, gap: 0.02 }),
+  hospital: () => playTone([350, 280, 350, 280], { duration: 0.1, type: "sine", gain: 0.08, gap: 0.02 }),
+  card: () => playTone([600, 750, 900], { duration: 0.07, type: "triangle", gain: 0.08, gap: 0.01 }),
+  bank: () => playTone([500, 650], { duration: 0.1, type: "sine", gain: 0.08, gap: 0.02 }),
+  lottery: () => playTone([700, 850, 1000], { duration: 0.08, type: "triangle", gain: 0.09, gap: 0.01 }),
+  step: () => playTone([350], { duration: 0.04, type: "sine", gain: 0.04, gap: 0 }),
 };
+
+// 按落地的地块类型播放对应的到达反馈音效
+function playArrivalSfx(tile) {
+  switch (tile.type) {
+    case "jail": case "gotojail":
+      SFX.jail();
+      break;
+    case "bank":
+      SFX.bank();
+      break;
+    case "lottery":
+      SFX.lottery();
+      break;
+    case "card":
+      SFX.card();
+      break;
+    case "tax":
+      SFX.payRent();
+      break;
+    default:
+      SFX.notify();
+  }
+}
 
 // 根据日志文本内容推断该播放哪个音效（轻量启发式，不需要服务器额外传事件类型）
 function inferSfxFromLogText(text) {
@@ -1137,6 +1206,9 @@ function inferSfxFromLogText(text) {
   if (text.includes("获胜")) return SFX.win;
   if (text.includes("开标") || text.includes("中奖") || text.includes("开奖") && text.includes("🎉")) return SFX.jackpot;
   if (text.includes("购买了")) return SFX.buy;
+  if (text.includes("住院") || text.includes("过劳")) return SFX.hospital;
+  if (text.includes("监狱") || text.includes("出狱") || text.includes("越狱")) return SFX.jail;
+  if (text.includes("抽到")) return SFX.card;
   if (text.includes("支付租金") || text.includes("缴纳")) return SFX.payRent;
   return null;
 }
@@ -1152,9 +1224,10 @@ function playSfxForNewLogs(state) {
   App.lastSeenLogIndex = state.log.length;
 
   // 把新日志加入播报队列，依次大字展示（避免多条同时弹出互相覆盖）
-  // 过滤掉"掷出"相关的日志：这些已经由骰子专属展示形式（真实骰子图标）处理，避免重复播报同一事件
+  // 过滤掉"掷出"和"来到"相关的日志：这两类信息已经由骰子专属展示形式（真实骰子图标+落地地块名）
+  // 完整展示过了，如果不过滤会导致同一次掷骰子事件被播报两遍（先是骰子结果，紧接着又单独弹出"来到XX"）
   if (newLogs.length > 0) {
-    const filtered = newLogs.filter((l) => !l.text.includes("掷出"));
+    const filtered = newLogs.filter((l) => !l.text.includes("掷出") && !/^.+来到/.test(l.text));
     AnnounceQueue.items.push(...filtered.map((l) => ({ type: "text", data: l.text })));
     processAnnounceQueue();
   }
@@ -1175,10 +1248,12 @@ function processAnnounceQueue() {
   let displayMs;
   if (item.type === "dice") {
     showDiceAnnounce(item.data);
-    displayMs = 2200;
+    displayMs = 3200; // 之前2200ms偏短，延长到3200ms给用户足够时间看清骰子结果
   } else {
     showLogAnnounce(item.data);
-    displayMs = Math.min(2600, Math.max(1400, item.data.length * 90));
+    // 之前最短1400ms/最长2600ms/每字90ms 偏短导致文字来不及看完，整体延长：
+    // 最短2200ms，最长4000ms，每字130ms
+    displayMs = Math.min(4000, Math.max(2200, item.data.length * 130));
   }
 
   setTimeout(() => {
@@ -1196,7 +1271,7 @@ function showLogAnnounce(text) {
   overlay.appendChild(el("div", { style: "font-size:15px; line-height:1.4;" }, text));
   overlay.classList.add("show");
   clearTimeout(overlay._timer);
-  const hideDelay = Math.min(2600, Math.max(1400, text.length * 90)) - 200;
+  const hideDelay = Math.min(4000, Math.max(2200, text.length * 130)) - 200;
   overlay._timer = setTimeout(() => overlay.classList.remove("show"), Math.max(200, hideDelay));
 }
 
@@ -1231,6 +1306,11 @@ function showDiceAnnounce(announce) {
   const [d1, d2] = announce.dice;
   const toTile = announce.toPos != null ? BOARD[announce.toPos] : null;
 
+  SFX.diceSettle(); // 骰子定格音效
+  if (toTile) {
+    setTimeout(() => playArrivalSfx(toTile), 250); // 稍微延迟，避免跟骰子音效叠在一起分不清
+  }
+
   overlay.innerHTML = "";
   overlay.appendChild(el("div", { style: "font-size:14px; margin-bottom:6px;" }, `${announce.playerName} 掷出了`));
 
@@ -1248,7 +1328,7 @@ function showDiceAnnounce(announce) {
   overlay.classList.remove("rolling-state");
   overlay.classList.add("show");
   clearTimeout(overlay._timer);
-  overlay._timer = setTimeout(() => overlay.classList.remove("show"), 2200);
+  overlay._timer = setTimeout(() => overlay.classList.remove("show"), 3200);
 }
 
 // 显示"滚动中"的骰子浮层（点击掷骰子按钮后立即调用，此时还没有真实结果，只是视觉上的滚动动效）
@@ -1371,15 +1451,27 @@ function connectToRoom(roomId, playerName) {
       }
       // 检测新的骰子播报，加入统一播报队列（与文字日志共用排队机制，避免互相打断覆盖）
       if (msg.state.lastDiceAnnounce && msg.state.lastDiceAnnounce !== prevDiceAnnounce) {
+        const announce = msg.state.lastDiceAnnounce;
         if (App.awaitingOwnDiceResult) {
           // 自己刚点击了掷骰子，正在等待这个真实结果：立即插队播放，不用排到队尾等待
           App.awaitingOwnDiceResult = false;
-          AnnounceQueue.items.unshift({ type: "dice", data: msg.state.lastDiceAnnounce });
+          AnnounceQueue.items.unshift({ type: "dice", data: announce });
           AnnounceQueue.showing = false; // 解除之前"正在掷骰子"占用的忙碌标记，让队列重新处理
           processAnnounceQueue();
         } else {
-          AnnounceQueue.items.push({ type: "dice", data: msg.state.lastDiceAnnounce });
+          AnnounceQueue.items.push({ type: "dice", data: announce });
           processAnnounceQueue();
+        }
+        // 触发分步走路动画：只有"正常掷骰子移动"（步数与骰子点数一致）才走格子动画，
+        // 命运卡传送（步数与骰子不符）保留原本的平滑瞬移
+        if (announce.fromPos != null && announce.toPos != null) {
+          const diceSum = announce.dice[0] + announce.dice[1];
+          const path = computeWalkPath(announce.fromPos, announce.toPos);
+          const isDiceMove = path.length === diceSum; // 步数吻合→正常骰子移动
+          if (isDiceMove && path.length > 1) {
+            animateWalkPath(announce.playerId, announce.fromPos, path);
+          }
+          // 如果是传送（命运卡），棋子会在下面的 render() 调用里直接更新到终点位置，自然实现瞬移
         }
       }
 
@@ -1442,6 +1534,7 @@ function rollDiceWithAnimation() {
   const me = App.gameState?.players.find((p) => p.id === App.playerId);
   App.awaitingOwnDiceResult = true;
   showDiceRollingOverlay(me ? me.name : "你");
+  SFX.diceRoll(); // 掷骰子瞬间的音效反馈
   // 短暂延迟后才真正发请求，让滚动动画有时间播放，体验更像真的在掷骰子
   setTimeout(() => {
     sendAction("rollDice");
@@ -1592,6 +1685,54 @@ function getTileCenterPercent(tileId) {
   };
 }
 
+// 计算从fromPos走到toPos途经的每一格（正向，处理绕过起点的取模情况）。
+// 返回的数组不包含fromPos本身，但包含toPos，用于棋子"一格格走"的动画播放。
+// steps上限给个保护，避免異常数据（比如fromPos===toPos或超大步数）导致生成过长数组卡死。
+// 正在播放分步走路动画的玩家id集合：这些玩家的棋子位置由动画控制，
+// updateTokenPositions需要跳过它们，避免直接覆盖到终点把动画打断
+const WalkAnimationLocks = new Set();
+
+function animateWalkPath(playerId, fromPos, path) {
+  const STEP_INTERVAL = 150;
+  WalkAnimationLocks.add(playerId);
+
+  path.forEach((stepPos, idx) => {
+    setTimeout(() => {
+      const tokenEl = document.getElementById(`token-${playerId}`);
+      if (!tokenEl) {
+        WalkAnimationLocks.delete(playerId);
+        return;
+      }
+
+      const { leftPct, topPct } = getTileCenterPercent(stepPos);
+      tokenEl.style.left = `${leftPct}%`;
+      tokenEl.style.top = `${topPct}%`;
+      SFX.step();
+
+      if (idx === path.length - 1) {
+        tokenEl.classList.remove("token-bounce");
+        requestAnimationFrame(() => tokenEl.classList.add("token-bounce"));
+        highlightLandedTile(stepPos);
+        // 动画结束，释放锁
+        WalkAnimationLocks.delete(playerId);
+      }
+    }, idx * STEP_INTERVAL);
+  });
+}
+
+function computeWalkPath(fromPos, toPos) {
+  if (fromPos == null || toPos == null || fromPos === toPos) return [toPos];
+  const path = [];
+  let cur = fromPos;
+  let guard = 0;
+  while (cur !== toPos && guard < 40) {
+    cur = (cur + 1) % 40;
+    path.push(cur);
+    guard++;
+  }
+  return path.length > 0 ? path : [toPos];
+}
+
 function renderBoard(state) {
   const wrapper = el("div", { class: "board-grid" });
   const propStates = state.properties;
@@ -1660,68 +1801,23 @@ function renderBoard(state) {
   centerOverlay.appendChild(buildLogChatPanel(state));
   viewport.appendChild(centerOverlay);
 
-  const resetBtn = el("button", { class: "camera-reset-btn" }, "🗺️ 回到全局视图");
-  resetBtn.addEventListener("click", () => {
-    Camera.locked = false;
-    applyCameraTransform();
-  });
-  viewport.appendChild(resetBtn);
-
-  // 应用当前镜头状态（首次渲染时立即对齐，避免出现一帧默认视角再跳转的闪烁）
+  // 确保棋盘始终是正常大小（镜头跟随功能已取消）
   setTimeout(() => applyCameraTransform(), 0);
 
   return viewport;
 }
 
 // ---------- 镜头跟随系统 ----------
+// 镜头系统：经实测，自动缩放跟随会让放大后的棋盘被中心信息面板（动态/聊天）几乎完全遮挡，
+// 可视棋盘范围被压缩到只剩一窄条，体验不佳，因此固定使用全局视图，不再自动缩放跟随玩家。
 const Camera = {
-  locked: true, // true: 自动跟随当前回合玩家；false: 用户手动切到全局视图
+  locked: false,
 };
 
-function applyCameraTransform(retriesLeft = 5) {
+function applyCameraTransform() {
   const boardAreaInner = document.getElementById("board-area-inner");
-  const viewport = document.querySelector(".board-viewport");
-  if (!boardAreaInner || !viewport || !App.gameState) return;
-  const state = App.gameState;
-
-  if (!Camera.locked || state.phase !== "playing") {
-    boardAreaInner.style.transform = "translate(0px, 0px) scale(1)";
-    return;
-  }
-
-  const cp = state.players[state.currentPlayerIndex];
-  if (!cp) {
-    boardAreaInner.style.transform = "translate(0px, 0px) scale(1)";
-    return;
-  }
-
-  const scale = 1.8;
-  const vw = viewport.clientWidth;
-  const vh = viewport.clientHeight;
-  if (!vw || !vh) {
-    // 容器还没有真实布局尺寸（常见于刚切换screen的那一帧），用 requestAnimationFrame 重试几次，
-    // 而不是直接放弃——否则会出现"镜头一直空白"的问题，因为后续也未必有别的时机重新触发计算
-    if (retriesLeft > 0) {
-      requestAnimationFrame(() => applyCameraTransform(retriesLeft - 1));
-    }
-    return;
-  }
-
-  const { leftPct, topPct } = getTileCenterPercent(cp.position);
-  // 目标格子中心在"未缩放"坐标系下的像素位置
-  const targetX = (leftPct / 100) * vw;
-  const targetY = (topPct / 100) * vh;
-  // 视窗中心的像素位置（同时也是 transform-origin: center center 的不动点）
-  const centerX = vw / 2;
-  const centerY = vh / 2;
-  // 推导：transform-origin 为中心时，先把坐标系原点移到中心 (p' = p - center)，
-  // 再应用 scale(s) translate(tx,ty)（CSS书写顺序对应"先translate后scale"的复合），
-  // 即 final = s * (p' + t)。要让目标点变换后落在原点（屏幕中心），
-  // 令 final = 0 解得 t = -p'，不需要除以 scale。
-  const translateX = centerX - targetX;
-  const translateY = centerY - targetY;
-
-  boardAreaInner.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
+  if (!boardAreaInner) return;
+  boardAreaInner.style.transform = "translate(0px, 0px) scale(1)";
 }
 
 function makeDieEl(value) {
@@ -1744,19 +1840,19 @@ function renderTokens(state, layer) {
     const { leftPct, topPct } = getTileCenterPercent(Number(tileId));
     const n = players.length;
     players.forEach((p, idx) => {
-      // 多人同格时，围绕格子中心做小幅度偏移，避免完全重叠看不清
+      // 多人同格时，围绕格子中心做偏移，避免完全重叠看不清（棋子变大后偏移半径也相应增大）
       const offsetAngle = (idx / Math.max(n, 1)) * 2 * Math.PI;
-      const offsetRadius = n > 1 ? 2.2 : 0;
+      const offsetRadius = n > 1 ? 3 : 0;
       const left = leftPct + Math.cos(offsetAngle) * offsetRadius;
       const top = topPct + Math.sin(offsetAngle) * offsetRadius;
 
       const tokenEl = el("div", {
         id: `token-${p.id}`,
         class: "token-moving",
-        style: `left:${left}%; top:${top}%; width:24px; height:27px;`,
+        style: `left:${left}%; top:${top}%;`,
         title: p.name,
       });
-      tokenEl.innerHTML = renderPixelAvatar(p, 24, WalkAnimation.frame);
+      tokenEl.innerHTML = renderPixelAvatar(p, TOKEN_DISPLAY_SIZE, WalkAnimation.frame);
       // 等距立体小人不再用圆形裁切容器（会切掉立体感），改为无背景无边框的透明容器，小人本身自带阴影投影
       layer.appendChild(tokenEl);
     });
@@ -1764,6 +1860,10 @@ function renderTokens(state, layer) {
 }
 
 // ---------- 棋盘小人走路动画驱动：全局定时器循环切换走路帧，让所有棋子持续有"走动感" ----------
+// 棋子在棋盘上的显示尺寸（SVG内部viewBox像素值，用于renderPixelAvatar的size参数；
+// 外层容器的实际CSS尺寸由.token-moving的clamp()控制，会随棋盘实际宽度做比例缩放）
+const TOKEN_DISPLAY_SIZE = 32;
+
 const WalkAnimation = {
   frame: 0,
   timer: null,
@@ -1778,7 +1878,7 @@ function startWalkAnimationLoop() {
       layer.querySelectorAll(".token-moving").forEach((tokenEl) => {
         const pid = tokenEl.id.replace("token-", "");
         const p = App.gameState.players.find((pl) => pl.id === pid);
-        if (p) tokenEl.innerHTML = renderPixelAvatar(p, 24, WalkAnimation.frame);
+        if (p) tokenEl.innerHTML = renderPixelAvatar(p, TOKEN_DISPLAY_SIZE, WalkAnimation.frame);
       });
     }
   }, 450);
@@ -1902,6 +2002,18 @@ function buildPlayerStrip(state) {
     const avatarWrap = el("div", { style: "width:32px; height:32px; border-radius:50%; overflow:hidden; border:2.5px solid var(--ink); flex-shrink:0;" });
     avatarWrap.innerHTML = renderPixelAvatar(p, 32);
     const isLowCash = !p.bankrupt && p.cash < 100;
+
+    const job = p.jobId ? JOBS[p.jobId] : null;
+    const jobLabel = job
+      ? el("div", { class: "player-chip-job", title: "点击查看职业效果" }, `${job.icon} ${job.name}`)
+      : null;
+    if (jobLabel) {
+      jobLabel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        showJobTooltip(jobLabel, job);
+      });
+    }
+
     playerStrip.appendChild(el("div", {
       class: `player-chip ${p.id === cp.id ? "player-chip-active" : ""} ${p.bankrupt ? "player-chip-bankrupt" : ""}`,
     }, [
@@ -1909,11 +2021,38 @@ function buildPlayerStrip(state) {
       el("div", { class: "player-chip-info" }, [
         el("div", { class: "player-chip-name" }, p.name + (p.id === App.playerId ? "（你）" : "")),
         el("div", { class: "player-chip-cash" + (isLowCash ? " cash-low-warning" : "") }, p.bankrupt ? "💥 破产" : `$${p.cash}`),
+        jobLabel,
       ]),
       !p.connected ? el("span", { class: "conn-dot offline", style: "margin-left:4px;" }) : null,
     ]));
   });
   return playerStrip;
+}
+
+// 点击职业标签时，弹出一个小气泡显示该职业的效果说明，再次点击别处会自动关闭
+function showJobTooltip(anchorEl, job) {
+  closeJobTooltip(); // 先关掉可能存在的上一个气泡，避免叠加
+
+  const rect = anchorEl.getBoundingClientRect();
+  const tooltip = el("div", {
+    id: "job-tooltip",
+    class: "job-tooltip",
+    style: `left:${rect.left}px; top:${rect.bottom + 6}px;`,
+  }, [
+    el("div", { style: "font-weight:800; margin-bottom:4px;" }, `${job.icon} ${job.name}`),
+    el("div", { style: "font-size:12px; line-height:1.4;" }, job.desc),
+  ]);
+  document.body.appendChild(tooltip);
+
+  // 点击气泡之外的任何地方都关闭它
+  setTimeout(() => {
+    document.addEventListener("click", closeJobTooltip, { once: true });
+  }, 0);
+}
+
+function closeJobTooltip() {
+  const existing = document.getElementById("job-tooltip");
+  if (existing) existing.remove();
 }
 
 function buildTurnBanner(state) {
@@ -2542,26 +2681,29 @@ function updateTokenPositions(state, layer) {
 
       let tokenEl = document.getElementById(`token-${p.id}`);
       if (tokenEl) {
-        // 已存在：只改变位置触发 transition 动画
-        const movedDistance = Math.abs(parseFloat(tokenEl.style.left) - left) + Math.abs(parseFloat(tokenEl.style.top) - top);
-        tokenEl.style.left = `${left}%`;
-        tokenEl.style.top = `${top}%`;
-        if (movedDistance > 0.5) {
-          tokenEl.classList.remove("token-bounce");
-          // 触发重排后再加class，确保动画能重新播放
-          requestAnimationFrame(() => tokenEl.classList.add("token-bounce"));
-          // 落地高亮：目标地块短暂放大后恢复，强化"走到这里了"的反馈
-          highlightLandedTile(Number(tileId));
+        // 如果这个玩家的棋子正在播放分步走路动画，跳过本次位置更新，让动画函数控制棋子位置
+        if (WalkAnimationLocks.has(p.id)) {
+          // 动画运行中，不覆盖位置
+        } else {
+          // 已存在：只改变位置触发 transition 动画
+          const movedDistance = Math.abs(parseFloat(tokenEl.style.left) - left) + Math.abs(parseFloat(tokenEl.style.top) - top);
+          tokenEl.style.left = `${left}%`;
+          tokenEl.style.top = `${top}%`;
+          if (movedDistance > 0.5) {
+            tokenEl.classList.remove("token-bounce");
+            requestAnimationFrame(() => tokenEl.classList.add("token-bounce"));
+            highlightLandedTile(Number(tileId));
+          }
         }
       } else {
         // 新建（首次出现，如刚加入游戏）
         tokenEl = el("div", {
           id: `token-${p.id}`,
           class: "token-moving",
-          style: `left:${left}%; top:${top}%; width:24px; height:27px;`,
+          style: `left:${left}%; top:${top}%;`,
           title: p.name,
         });
-        tokenEl.innerHTML = renderPixelAvatar(p, 24, WalkAnimation.frame);
+        tokenEl.innerHTML = renderPixelAvatar(p, TOKEN_DISPLAY_SIZE, WalkAnimation.frame);
         layer.appendChild(tokenEl);
       }
     });
